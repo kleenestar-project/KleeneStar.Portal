@@ -1,4 +1,91 @@
 # de_DE  language resource file
 plugin.name=KleeneStar.Portal
-plugin.description=Portal-Plugin für die KleeneStar-Anwendung.
+plugin.description=Kundenportal-Plugin für die KleeneStar-Plattform.
 
+app.name=KleeneStar Service-Portal
+app.label=KleeneStar Service-Portal
+app.description=Das Kundenportal von KleeneStar — der einfache Weg, Anliegen zu melden, zu verfolgen und zu lösen.
+
+# Page titles
+home.title=Service-Portal
+login.title=Anmelden
+mine.title=Meine Vorgänge
+org.title=Organisation
+
+# Top navigation labels
+nav.home.label=Start
+nav.mine.label=Meine Vorgänge
+nav.org.label=Organisation
+
+# Issue lifecycle states (German)
+state.open=Offen
+state.in-progress=In Bearbeitung
+state.waiting=Wartet auf mich
+state.resolved=Gelöst
+state.closed=Geschlossen
+
+# Common UI labels
+issue.description.label=Beschreibung
+issue.history.label=Verlauf
+issue.details.label=Details
+issue.shared-with.label=Geteilt mit
+issue.watchers.label=Beobachter
+issue.requester.label=Anfragesteller
+issue.assignee.label=Bearbeitet von
+issue.created.label=Erstellt
+issue.updated.label=Aktualisiert
+issue.priority.label=Priorität
+issue.type.label=Typ
+issue.approval-required.label=Freigabe erforderlich
+
+# Home page
+home.headline=Wie können wir helfen?
+home.headline.with-name=Wie können wir helfen, {0}?
+home.request-types.heading=ANFRAGE-TYPEN
+home.recent.heading=ZULETZT VON DIR
+home.recent.empty=Noch keine Anfragen.
+
+# Mine page
+mine.headline=Meine Vorgänge
+mine.description=Anfragen, die du erstellt hast oder bei denen du beteiligt bist.
+mine.empty=Keine passenden Vorgänge — andere Filter probieren oder eine neue Anfrage starten.
+
+# Organization page
+org.headline=Vorgänge in der Organisation
+org.description=Alle Anfragen, auf die du Zugriff hast.
+org.empty=Keine Vorgänge sichtbar.
+
+# Request type tiles
+request-type.templates.count={0} Vorlagen
+
+# Issue detail page
+issue.not-found=Vorgang '{0}' wurde nicht gefunden oder ist nicht für dich freigegeben.
+issue.header.summary={0} · {1} · {2} · {3} · von {4} · zugewiesen an {5}
+issue.resolution.banner=Lösung vorgeschlagen. Bitte prüfen und bestätigen, dass dein Anliegen behoben ist.
+issue.description.heading=BESCHREIBUNG
+issue.history.entry.singular=Eintrag
+issue.history.entry.plural=Einträge
+issue.history.heading=VERLAUF · {0} {1}
+issue.system=System
+issue.details.heading=DETAILS
+issue.note.label=Hinweis
+issue.shared-with.heading=GETEILT MIT ({0})
+issue.watchers.heading=BEOBACHTER ({0})
+
+# Common values
+common.na=—
+common.separator.value= · {0}
+
+# Relative time
+relative.ago.prefix=vor
+relative.minutes=Min.
+relative.hours=Std.
+relative.days=Tagen
+relative.weeks=Wochen
+
+# Table headers
+table.key=Schlüssel
+table.title=Titel
+table.status=Status
+table.priority=Priorität
+table.updated=Aktualisiert
