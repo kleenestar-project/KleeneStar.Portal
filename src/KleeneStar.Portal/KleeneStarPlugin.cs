@@ -1,4 +1,3 @@
-using WebExpress.WebCore;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebPlugin;
 
@@ -20,7 +19,6 @@ namespace KleeneStar.Portal
         /// </summary>
         public KleeneStarPlugin()
         {
-            WebEx.Favicon = "/portal/assets/img/kleenestar.ico";
         }
 
         /// <summary>
