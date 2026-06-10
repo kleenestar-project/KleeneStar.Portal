@@ -89,3 +89,13 @@ table.title=Title
 table.status=Status
 table.priority=Priority
 table.updated=Updated
+
+# REST API endpoint titles
+api.requesttypes.title=Request type catalog
+api.issues.title=Issues
+api.issue.title=Issue
+api.issue.comments.title=Issue comments
+api.issue.share.title=Issue sharing
+api.issue.watch.title=Issue watch subscription
+api.issue.accept.title=Accept resolution
+api.issue.reject.title=Reject resolution

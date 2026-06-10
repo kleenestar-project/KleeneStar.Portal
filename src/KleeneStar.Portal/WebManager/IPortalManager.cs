@@ -123,6 +123,14 @@ namespace KleeneStar.Portal.WebManager
         IIssue ShareIssue(string issueKey, IEnumerable<string> identityIds);
 
         /// <summary>
+        /// Revokes a previously granted share from an issue.
+        /// </summary>
+        /// <param name="issueKey">The issue whose share is revoked.</param>
+        /// <param name="identityId">The identity id whose share access is removed.</param>
+        /// <returns>The updated issue.</returns>
+        IIssue UnshareIssue(string issueKey, string identityId);
+
+        /// <summary>
         /// Subscribes the calling identity to the issue's notifications.
         /// </summary>
         /// <param name="issueKey">The issue to watch.</param>
