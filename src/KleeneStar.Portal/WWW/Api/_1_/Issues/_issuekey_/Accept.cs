@@ -58,20 +58,19 @@ namespace KleeneStar.Portal.WWW.Api._1_.Issues._issuekey_
                 return PortalApi.NotFound();
             }
 
+            // closed issues are an idempotent no-op (concept §API). Every other
+            // non-Resolved state — including stale Idempotency — is a 409 surfaced
+            // by the manager as a PortalConflictException.
             if (issue.PortalState == PortalIssueState.Closed)
             {
-                // idempotent: repeated accepts on a closed issue have no further effect
                 return PortalApi.NoContent();
             }
 
-            if (issue.PortalState != PortalIssueState.Resolved)
+            return PortalApi.RunWithConflictMapping(() =>
             {
-                return PortalApi.Conflict("No resolution has been proposed for this issue.");
-            }
-
-            _portalManager.AcceptResolution(key);
-
-            return PortalApi.NoContent();
+                _portalManager.AcceptResolution(key);
+                return PortalApi.NoContent();
+            });
         }
     }
 }

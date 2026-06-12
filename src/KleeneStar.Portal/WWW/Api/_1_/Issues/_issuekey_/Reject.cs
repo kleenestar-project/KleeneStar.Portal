@@ -58,14 +58,11 @@ namespace KleeneStar.Portal.WWW.Api._1_.Issues._issuekey_
                 return PortalApi.NotFound();
             }
 
-            if (issue.PortalState != PortalIssueState.Resolved)
+            return PortalApi.RunWithConflictMapping(() =>
             {
-                return PortalApi.Conflict("No resolution has been proposed for this issue.");
-            }
-
-            _portalManager.RejectResolution(key, payload.Reason);
-
-            return PortalApi.NoContent();
+                _portalManager.RejectResolution(key, payload.Reason);
+                return PortalApi.NoContent();
+            });
         }
 
         /// <summary>

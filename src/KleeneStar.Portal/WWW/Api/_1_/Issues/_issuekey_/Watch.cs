@@ -52,9 +52,11 @@ namespace KleeneStar.Portal.WWW.Api._1_.Issues._issuekey_
         [Method(RequestMethod.DELETE)]
         public IResponse Delete(IRequest request)
         {
-            var issue = _portalManager.Unwatch(PortalApi.GetIssueKey(request));
-
-            return issue is null ? PortalApi.NotFound() : PortalApi.NoContent();
+            return PortalApi.RunWithConflictMapping(() =>
+            {
+                var issue = _portalManager.Unwatch(PortalApi.GetIssueKey(request));
+                return issue is null ? PortalApi.NotFound() : PortalApi.NoContent();
+            });
         }
     }
 }

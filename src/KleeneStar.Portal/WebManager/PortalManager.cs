@@ -84,11 +84,15 @@ namespace KleeneStar.Portal.WebManager
         /// <inheritdoc/>
         public event EventHandler<IIssue> IssueUnwatched;
         /// <inheritdoc/>
-        // Raised when the operator side proposes a resolution; the portal itself only
-        // accepts or rejects, so this event currently has no portal-side trigger.
-#pragma warning disable CS0067
+        // Raised when the operator side proposes a resolution: the underlying object
+        // is stamped with a Done-category, non-terminal status (e.g. "Resolved",
+        // "Awaiting Confirmation") and the issue becomes the user-facing "Resolved"
+        // state. The portal itself only accepts or rejects, so this event is raised
+        // by operator-side workflow transitions — call
+        // <see cref="NotifyResolutionProposed(Guid)"/> from the operator workflow
+        // code the moment a status in the Done category is stamped onto a
+        // portal-visible object.
         public event EventHandler<IIssue> IssueResolutionProposed;
-#pragma warning restore CS0067
         /// <inheritdoc/>
         public event EventHandler<IIssue> IssueResolutionAccepted;
         /// <inheritdoc/>
@@ -144,6 +148,12 @@ namespace KleeneStar.Portal.WebManager
         /// <inheritdoc/>
         public IReadOnlyList<IIssue> GetIssues(IssueScope scope)
         {
+            return GetIssues(scope, FallbackIdentityId);
+        }
+
+        /// <inheritdoc/>
+        public IReadOnlyList<IIssue> GetIssues(IssueScope scope, Guid? callerId)
+        {
             var classes = GetPortalClasses();
             var requestTypes = classes
                 .Select((cls, index) => (cls.Id, RequestType: BuildRequestType(cls, index)))
@@ -160,7 +170,34 @@ namespace KleeneStar.Portal.WebManager
                 .GroupBy(w => w.ObjectId)
                 .ToDictionary(g => g.Key, g => g.ToList());
 
-            var me = FallbackIdentityId;
+            var me = callerId ?? FallbackIdentityId;
+            var meIdentity = CoreHub.IdentityManager.GetIdentity(me);
+
+            // OrgScope tenant isolation (concept §Permissions): the caller sees
+            // every issue of a portal-visible class whose workspace is shared
+            // with the caller's tenant. Identities without a tenant (operator-side
+            // accounts) see nothing in OrgScope. MineScope is unaffected.
+            Guid? callerTenantId = meIdentity?.TenantId;
+            HashSet<Guid> orgScopeWorkspaceIds = null;
+            if (scope == IssueScope.Organization)
+            {
+                if (callerTenantId is null)
+                {
+                    return [];
+                }
+
+                orgScopeWorkspaceIds = CoreHub.WorkspaceManager
+                    .GetWorkspaces(new Query<Workspace>())
+                    .Where(w => w.Tenants != null && w.Tenants.Any(t => t.Id == callerTenantId.Value))
+                    .Select(w => w.Id)
+                    .ToHashSet();
+
+                if (orgScopeWorkspaceIds.Count == 0)
+                {
+                    return [];
+                }
+            }
+
             var issues = new List<IIssue>();
 
             foreach (var cls in classes)
@@ -181,6 +218,15 @@ namespace KleeneStar.Portal.WebManager
                             || (watchers?.Any(w => w.IdentityId == me) ?? false);
 
                         if (!isMine)
+                        {
+                            continue;
+                        }
+                    }
+                    else if (scope == IssueScope.Organization)
+                    {
+                        // tenant isolation: drop issues whose workspace is not
+                        // shared with the caller's tenant
+                        if (!orgScopeWorkspaceIds!.Contains(entity.WorkspaceId))
                         {
                             continue;
                         }
@@ -408,10 +454,20 @@ namespace KleeneStar.Portal.WebManager
 
             var context = BuildClassContext(cls);
             var current = BuildIssue(entity, cls);
+
+            // closed issues are an idempotent no-op: re-accepting after the issue has
+            // been closed is allowed (concept §API: "Accepting is idempotent on closed
+            // issues — repeated calls have no further effect").
+            if (current.PortalState == PortalIssueState.Closed)
+            {
+                return current;
+            }
+
+            // any other non-Resolved state is a 409 — the operator side never
+            // proposed a resolution for the requester to confirm.
             if (current.PortalState != PortalIssueState.Resolved)
             {
-                // idempotent: accepting anything but a proposed resolution is a no-op
-                return current;
+                throw new PortalConflictException("No resolution has been proposed for this issue.");
             }
 
             // the closing status is the Done-category status whose name reads terminal
@@ -453,9 +509,10 @@ namespace KleeneStar.Portal.WebManager
 
             var context = BuildClassContext(cls);
             var current = BuildIssue(entity, cls);
+
             if (current.PortalState != PortalIssueState.Resolved)
             {
-                return current;
+                throw new PortalConflictException("No resolution has been proposed for this issue.");
             }
 
             var target = context.Statuses.FirstOrDefault(s => MapCategoryName(context, s) == "inprogress");
@@ -485,7 +542,6 @@ namespace KleeneStar.Portal.WebManager
         {
             GC.SuppressFinalize(this);
         }
-
         /// <summary>
         /// Adds or removes the watch relationship between the current identity and the
         /// addressed issue and raises the corresponding events.
@@ -493,15 +549,29 @@ namespace KleeneStar.Portal.WebManager
         /// <param name="issueKey">The issue key.</param>
         /// <param name="watch"><see langword="true"/> to watch, <see langword="false"/> to unwatch.</param>
         /// <returns>The updated issue projection, or <see langword="null"/> when the issue does not exist.</returns>
+        /// <exception cref="PortalConflictException">
+        /// Thrown when <paramref name="watch"/> is <see langword="false"/> and the calling
+        /// identity is not subscribed to the issue (concept §API: 409 Conflict on
+        /// <c>DELETE</c> of a non-existent subscription).
+        /// </exception>
         private IIssue SetWatching(string issueKey, bool watch)
         {
             var entity = ResolveIssueObject(issueKey, out var cls);
+
             if (entity is null)
             {
                 return null;
             }
 
             var me = FallbackIdentityId;
+
+            // the unwatch path is a state conflict when the caller has nothing to
+            // unsubscribe from — the REST layer maps this to 409.
+            if (!watch && !CoreHub.WatcherManager.GetWatchers(entity.Id).Any(w => w.IdentityId == me))
+            {
+                throw new PortalConflictException("You are not watching this issue.");
+            }
+
             var changed = watch
                 ? CoreHub.WatcherManager.Add(entity.Id, me) is not null
                 : CoreHub.WatcherManager.Remove(entity.Id, me);
@@ -521,6 +591,42 @@ namespace KleeneStar.Portal.WebManager
             }
 
             return issue;
+        }
+
+        /// <summary>
+        /// Fires the <see cref="IssueResolutionProposed"/> event for an issue whose
+        /// workflow status has just been stamped with a Done-category, non-terminal
+        /// status by the operator workflow. The portal REST layer never reaches this
+        /// helper directly; it is intended to be called from the operator workflow
+        /// code the moment a status transitions to the "awaiting requester
+        /// confirmation" station of a portal-visible class.
+        /// </summary>
+        /// <param name="objectId">The underlying object id.</param>
+        /// <returns>The projected issue when the event was raised, <see langword="null"/> otherwise.</returns>
+        public IIssue NotifyResolutionProposed(Guid objectId)
+        {
+            var entity = CoreHub.ObjectManager.GetObject(objectId);
+            if (entity is null)
+            {
+                return null;
+            }
+
+            var cls = CoreHub.ClassManager.GetClass(entity.ClassId);
+            if (cls is null || !cls.PortalVisible)
+            {
+                return null;
+            }
+
+            var context = BuildClassContext(cls);
+            var issue = BuildIssue(entity, context, requestType: null, shares: null, watchers: null, comments: null);
+
+            if (issue.PortalState == PortalIssueState.Resolved)
+            {
+                IssueResolutionProposed?.Invoke(this, issue);
+                return issue;
+            }
+
+            return null;
         }
 
         /// <summary>

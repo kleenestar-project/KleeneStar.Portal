@@ -88,6 +88,20 @@ namespace KleeneStar.Portal.WebManager
         IReadOnlyList<IIssue> GetIssues(IssueScope scope);
 
         /// <summary>
+        /// Returns the issues visible to <paramref name="callerId"/> in the requested
+        /// scope. Use this overload from REST endpoints and tests where the calling
+        /// identity is known; production pages pass the authenticated identity
+        /// resolved by the WebExpress session flow.
+        /// </summary>
+        /// <param name="scope">The scope filter — <c>Mine</c> or <c>Organization</c>.</param>
+        /// <param name="callerId">
+        /// The acting identity, or <see langword="null"/> to fall back to the seeded
+        /// admin (the legacy behavior of the no-caller overload).
+        /// </param>
+        /// <returns>The list of issues, ordered by most-recently updated first.</returns>
+        IReadOnlyList<IIssue> GetIssues(IssueScope scope, Guid? callerId);
+
+        /// <summary>
         /// Returns a single issue by its human-readable key.
         /// </summary>
         /// <param name="issueKey">The issue key (e.g. <c>INC-2041</c>).</param>
@@ -157,6 +171,22 @@ namespace KleeneStar.Portal.WebManager
         /// <param name="issueKey">The issue whose resolution is rejected.</param>
         /// <param name="reason">The mandatory rejection reason.</param>
         /// <returns>The updated issue.</returns>
+        /// <exception cref="PortalConflictException">
+        /// Thrown when the issue is not in <see cref="PortalIssueState.Resolved"/> (the
+        /// concept document's 409 Conflict on accepting / rejecting a non-proposed
+        /// resolution).
+        /// </exception>
         IIssue RejectResolution(string issueKey, string reason);
+
+        /// <summary>
+        /// Fires the <see cref="IssueResolutionProposed"/> event for an issue whose
+        /// workflow status has just been stamped with a Done-category, non-terminal
+        /// status by the operator workflow. No-op when the object is unknown, when the
+        /// object's class is not portal-visible, or when the new state does not
+        /// collapse to <see cref="PortalIssueState.Resolved"/>.
+        /// </summary>
+        /// <param name="objectId">The underlying object id.</param>
+        /// <returns>The projected issue when the event was raised, <see langword="null"/> otherwise.</returns>
+        IIssue NotifyResolutionProposed(Guid objectId);
     }
 }

@@ -29,6 +29,15 @@ namespace KleeneStar.Portal.Test.WebManager
         private static readonly Guid CategoryWaitingId = Guid.Parse("CC0C0C0C-0C0C-4CCC-8CCC-CCCCCCCCCCCC");
         private static readonly Guid CategoryDoneId = Guid.Parse("DD0D0D0D-0D0D-4DDD-8DDD-DDDDDDDDDDDD");
 
+        // Tenant isolation test fixtures.
+        private static readonly Guid AcmeTenantId = Guid.Parse("EEEEEEEE-EEEE-4EEE-8EEE-EEEEEEEEEEEE");
+        private static readonly Guid GlobexTenantId = Guid.Parse("FFFFFFFF-FFFF-4FFF-8FFF-FFFFFFFFFFFF");
+        private static readonly Guid GlobexWorkspaceId = Guid.Parse("0A0A0A0A-0A0A-4A0A-8A0A-0A0A0A0A0A0A");
+        private static readonly Guid GlobexMemberIdentityId = Guid.Parse("0B0B0B0B-0B0B-4B0B-8B0B-0B0B0B0B0B0B");
+        private static readonly Guid GlobexObjectId = Guid.Parse("0C0C0C0C-0C0C-4C0C-8C0C-0C0C0C0C0C0C");
+        private static readonly Guid TenantlessIdentityId = Guid.Parse("0D0D0D0D-0D0D-4D0D-8D0D-0D0D0D0D0D0D");
+        private static readonly Guid GlobexIncidentClassId = Guid.Parse("CCCCCCCC-CCCC-4CCC-8CCC-CCCCCCCCCCCC");
+
         /// <summary>
         /// Seeds the in-memory database with the full portal world: a workspace, a
         /// portal-visible Incident class (with workflow/priority fields, statuses across
@@ -49,7 +58,31 @@ namespace KleeneStar.Portal.Test.WebManager
                 return manager;
             }
 
-            db.Workspaces.Add(new Workspace { Id = WorkspaceId, Key = "SD", Name = "IT Service Desk" });
+            // tenant isolation fixtures — the standard workspace belongs to Acme;
+            // a sibling workspace for Globex shares the portal-visible class.
+            // Seeding them here keeps every existing test compatible while the
+            // new GetIssues_OrganizationScope_* cases drive the cross-tenant
+            // isolation behaviour.
+            var acmeTenant = new Tenant(AcmeTenantId) { Name = "Acme Corp", Description = "Acme tenant." };
+            var globexTenant = new Tenant(GlobexTenantId) { Name = "Globex Inc", Description = "Globex tenant." };
+            db.Tenants.Add(acmeTenant);
+            db.Tenants.Add(globexTenant);
+
+            db.Workspaces.Add(new Workspace
+            {
+                Id = WorkspaceId,
+                Key = "SD",
+                Name = "IT Service Desk",
+                Tenants = [acmeTenant]
+            });
+
+            db.Workspaces.Add(new Workspace
+            {
+                Id = GlobexWorkspaceId,
+                Key = "SDG",
+                Name = "Globex Service Desk",
+                Tenants = [globexTenant]
+            });
 
             db.Classes.Add(new Class
             {
@@ -57,6 +90,17 @@ namespace KleeneStar.Portal.Test.WebManager
                 Name = "Incident",
                 Description = "Incident management.",
                 WorkspaceId = WorkspaceId,
+                State = ClassState.Active,
+                PortalVisible = true
+            });
+            // the same class is portal-visible in the Globex workspace so
+            // GetIssues(Organization) finds tenant-eligible issues there too.
+            db.Classes.Add(new Class
+            {
+                Id = GlobexIncidentClassId,
+                Name = "Incident",
+                Description = "Incident management (Globex).",
+                WorkspaceId = GlobexWorkspaceId,
                 State = ClassState.Active,
                 PortalVisible = true
             });
@@ -157,12 +201,33 @@ namespace KleeneStar.Portal.Test.WebManager
             {
                 Name = "Admin User",
                 Email = "admin@kleenestar.org",
-                PasswordHash = "$test$"
+                PasswordHash = "$test$",
+                TenantId = AcmeTenantId,
+                Tenant = acmeTenant
             });
             db.Identities.Add(new Identity(MemberIdentityId)
             {
                 Name = "Anna Becker",
                 Email = "anna.becker@kleenestar.org",
+                PasswordHash = "$test$",
+                TenantId = AcmeTenantId,
+                Tenant = acmeTenant
+            });
+            // second tenant member — exercises the cross-tenant isolation path.
+            db.Identities.Add(new Identity(GlobexMemberIdentityId)
+            {
+                Name = "Gina Globex",
+                Email = "gina.globex@globex.example",
+                PasswordHash = "$test$",
+                TenantId = GlobexTenantId,
+                Tenant = globexTenant
+            });
+            // an operator-style identity without a tenant — must be excluded
+            // from IssueScope.Organization entirely.
+            db.Identities.Add(new Identity(TenantlessIdentityId)
+            {
+                Name = "Operator Sam",
+                Email = "sam@kleenestar.org",
                 PasswordHash = "$test$"
             });
 
@@ -197,6 +262,21 @@ namespace KleeneStar.Portal.Test.WebManager
                 CreatorId = PortalManager.FallbackIdentityId,
                 Created = DateTime.UtcNow,
                 Updated = DateTime.UtcNow
+            });
+            // a Globex-side issue — Globex is the only tenant on GlobexWorkspaceId
+            // so IssueScope.Organization must show it to GlobexMember and hide
+            // it from any Acme / tenant-less identity.
+            var globexIncidentClassId = Guid.Parse("CCCCCCCC-CCCC-4CCC-8CCC-CCCCCCCCCCCC");
+            db.Objects.Add(new ObjectEntity(GlobexObjectId)
+            {
+                Key = "SDG-1",
+                Summary = "Globex VPN drops",
+                Description = "Connection drops every ten minutes.",
+                WorkspaceId = GlobexWorkspaceId,
+                ClassId = globexIncidentClassId,
+                CreatorId = GlobexMemberIdentityId,
+                Created = DateTime.UtcNow.AddDays(-1),
+                Updated = DateTime.UtcNow.AddHours(-3)
             });
 
             void addValue(Guid objectId, Guid fieldId, string data) => db.Values.Add(new Value
@@ -245,11 +325,14 @@ namespace KleeneStar.Portal.Test.WebManager
 
             var requestTypes = manager.GetRequestTypes();
 
-            var requestType = Assert.Single(requestTypes);
-            Assert.Equal("incident", requestType.Key);
-            Assert.Equal("Incident", requestType.Title);
+            // the seed provisions two portal-visible Incident classes (Acme + Globex)
+            // sharing the same name; both are exposed as request types.
+            Assert.Equal(2, requestTypes.Count);
+            var acme = requestTypes.Single(rt => rt.Description == "Incident management.");
+            Assert.Equal("incident", acme.Key);
+            Assert.Equal("Incident", acme.Title);
 
-            var template = Assert.Single(requestType.Templates);
+            var template = Assert.Single(acme.Templates);
             Assert.Equal("self-service-form", template.Key);
             Assert.Equal("Self-Service Form", template.Title);
         }
@@ -268,18 +351,60 @@ namespace KleeneStar.Portal.Test.WebManager
         }
 
         /// <summary>
-        /// The organization scope lists every issue of every portal-visible class —
-        /// and nothing from internal classes.
+        /// The organization scope lists every issue of every portal-visible class
+        /// belonging to a workspace the caller's tenant is shared with, and nothing
+        /// from internal classes or from workspaces the caller is not part of.
         /// </summary>
         [Fact]
         public void GetIssues_OrganizationScope_ExcludesInternalClasses()
         {
             var manager = Seed(nameof(GetIssues_OrganizationScope_ExcludesInternalClasses));
 
+            // the seeded admin is an Acme member; both SD-1 and SD-2 live in the
+            // Acme workspace, so the Acme view sees both. SD-3 is on the internal
+            // class and must be excluded; the Globex issue (SDG-1) is on a
+            // workspace Acme is not part of, so it must be excluded too.
             var issues = manager.GetIssues(IssueScope.Organization);
 
             Assert.Equal(2, issues.Count);
             Assert.DoesNotContain(issues, i => i.Key == "SD-3");
+            Assert.DoesNotContain(issues, i => i.Key == "SDG-1");
+        }
+
+        /// <summary>
+        /// IssueScope.Organization is tenant-scoped: a Globex member sees only the
+        /// Globex workspace's issues, never the Acme workspace's.
+        /// </summary>
+        [Fact]
+        public void GetIssues_OrganizationScope_IsTenantIsolated()
+        {
+            var manager = Seed(nameof(GetIssues_OrganizationScope_IsTenantIsolated));
+
+            var acmeView = manager.GetIssues(IssueScope.Organization, PortalManager.FallbackIdentityId);
+            var globexView = manager.GetIssues(IssueScope.Organization, GlobexMemberIdentityId);
+
+            // the seeded admin (Acme) sees every issue of the Acme workspace
+            // (SD-1 and SD-2) but never the Globex workspace's issue.
+            Assert.Equal(2, acmeView.Count);
+            Assert.DoesNotContain(acmeView, i => i.Key == "SDG-1");
+
+            // the Globex member only sees the Globex workspace's issue.
+            Assert.Single(globexView);
+            Assert.Equal("SDG-1", globexView[0].Key);
+        }
+
+        /// <summary>
+        /// Operator-side identities (no tenant) are excluded from
+        /// <see cref="IssueScope.Organization"/> entirely.
+        /// </summary>
+        [Fact]
+        public void GetIssues_OrganizationScope_ExcludesTenantlessIdentities()
+        {
+            var manager = Seed(nameof(GetIssues_OrganizationScope_ExcludesTenantlessIdentities));
+
+            var org = manager.GetIssues(IssueScope.Organization, TenantlessIdentityId);
+
+            Assert.Empty(org);
         }
 
         /// <summary>
@@ -499,7 +624,8 @@ namespace KleeneStar.Portal.Test.WebManager
         /// <summary>
         /// AcceptResolution closes a Resolved issue (terminal Done-category status),
         /// appends the machine narration to the timeline, and raises the acceptance,
-        /// closed, and updated events. Accepting a non-Resolved issue is a no-op.
+        /// closed, and updated events. Accepting a non-Resolved, non-Closed issue is
+        /// a state conflict (concept §API: 409).
         /// </summary>
         [Fact]
         public void AcceptResolution_ClosesResolvedIssue()
@@ -512,9 +638,8 @@ namespace KleeneStar.Portal.Test.WebManager
             manager.IssueResolutionAccepted += (_, _) => accepted++;
             manager.IssueClosed += (_, _) => closed++;
 
-            // not yet resolved — accepting must not change anything
-            var unchanged = manager.AcceptResolution("SD-1");
-            Assert.Equal(PortalIssueState.InProgress, unchanged!.PortalState);
+            // not yet resolved — accepting must surface a 409 conflict
+            Assert.Throws<PortalConflictException>(() => manager.AcceptResolution("SD-1"));
             Assert.Equal(0, accepted);
 
             StampStatus(connectionString, MineObjectId, "Resolved");
@@ -525,11 +650,19 @@ namespace KleeneStar.Portal.Test.WebManager
             Assert.Contains(issue.Comments, c => c.Text.Contains("Resolution accepted"));
             Assert.Equal(1, accepted);
             Assert.Equal(1, closed);
+
+            // idempotent: re-accepting a closed issue returns the projection
+            // unchanged and fires no new events.
+            var second = manager.AcceptResolution("SD-1");
+            Assert.Equal(PortalIssueState.Closed, second!.PortalState);
+            Assert.Equal(1, accepted);
+            Assert.Equal(1, closed);
         }
 
         /// <summary>
         /// RejectResolution demands a reason, returns the issue to In Progress, and
-        /// appends the reason to the timeline.
+        /// appends the reason to the timeline. Rejecting a non-Resolved issue is a
+        /// state conflict (concept §API: 409).
         /// </summary>
         [Fact]
         public void RejectResolution_ReturnsIssueToInProgress()
@@ -538,6 +671,9 @@ namespace KleeneStar.Portal.Test.WebManager
             var manager = Seed(connectionString);
 
             Assert.ThrowsAny<ArgumentException>(() => manager.RejectResolution("SD-1", " "));
+
+            // rejecting a non-Resolved issue must surface a 409 conflict
+            Assert.Throws<PortalConflictException>(() => manager.RejectResolution("SD-1", "No."));
 
             StampStatus(connectionString, MineObjectId, "Resolved");
 
@@ -549,6 +685,49 @@ namespace KleeneStar.Portal.Test.WebManager
             Assert.Equal(PortalIssueState.InProgress, issue!.PortalState);
             Assert.Contains(issue.Comments, c => c.Text.Contains("Mail still not arriving."));
             Assert.Equal(1, rejected);
+        }
+
+        /// <summary>
+        /// Unwatch without an active subscription is a state conflict (concept §API:
+        /// 409). The state-of-the-art manager raises a <see cref="PortalConflictException"/>
+        /// so the REST layer can map it to a <c>409/422</c> response.
+        /// </summary>
+        [Fact]
+        public void Unwatch_WithoutActiveSubscription_ThrowsConflict()
+        {
+            var connectionString = nameof(Unwatch_WithoutActiveSubscription_ThrowsConflict);
+            var manager = Seed(connectionString);
+
+            Assert.Throws<PortalConflictException>(() => manager.Unwatch("SD-1"));
+        }
+
+        /// <summary>
+        /// <see cref="IPortalManager.NotifyResolutionProposed"/> raises the event
+        /// for an object whose workflow status collapses to <c>Resolved</c>, and
+        /// stays silent for an object in any other state.
+        /// </summary>
+        [Fact]
+        public void NotifyResolutionProposed_FiresOnlyForResolvedIssues()
+        {
+            var connectionString = nameof(NotifyResolutionProposed_FiresOnlyForResolvedIssues);
+            var manager = Seed(connectionString);
+
+            var raised = 0;
+            IIssue? raisedIssue = null;
+            manager.IssueResolutionProposed += (_, issue) => { raised++; raisedIssue = issue; };
+
+            // not yet resolved — must not fire
+            var miss = manager.NotifyResolutionProposed(MineObjectId);
+            Assert.Null(miss);
+            Assert.Equal(0, raised);
+
+            StampStatus(connectionString, MineObjectId, "Resolved");
+
+            var hit = manager.NotifyResolutionProposed(MineObjectId);
+            Assert.NotNull(hit);
+            Assert.Equal(PortalIssueState.Resolved, hit!.PortalState);
+            Assert.Equal(1, raised);
+            Assert.Same(hit, raisedIssue);
         }
 
         /// <summary>
@@ -565,9 +744,13 @@ namespace KleeneStar.Portal.Test.WebManager
             Assert.Equal("Admin User", current.Name);
 
             var members = manager.GetOrganizationMembers();
-            Assert.Equal(2, members.Count);
+            // the seed now provisions four identities (admin, Anna, Gina, Sam) so
+            // the directory covers both tenants and an operator account.
+            Assert.Equal(4, members.Count);
             Assert.Equal("Admin User", members[0].Name);
             Assert.Equal("Anna Becker", members[1].Name);
+            Assert.Equal("Gina Globex", members[2].Name);
+            Assert.Equal("Operator Sam", members[3].Name);
         }
     }
 }
