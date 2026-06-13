@@ -1,3 +1,4 @@
+using KleeneStar.Model.Entities;
 using KleeneStar.Portal.WebDomain;
 using System;
 using System.Collections.Generic;
@@ -105,8 +106,156 @@ namespace KleeneStar.Portal.WebManager
         /// Returns a single issue by its human-readable key.
         /// </summary>
         /// <param name="issueKey">The issue key (e.g. <c>INC-2041</c>).</param>
-        /// <returns>The matching issue, or <c>null</c> if not visible to the caller.</returns>
+        /// <returns>The matching issue, or <see langword="null"/> if not visible to the caller.</returns>
         IIssue GetIssue(string issueKey);
+
+        /// <summary>
+        /// Returns the workspaces the calling identity is allowed to administer from
+        /// the portal. A tenant-bearing identity sees the workspaces that share one
+        /// of its tenants; an operator-side identity (no tenant) sees every
+        /// workspace.
+        /// </summary>
+        /// <returns>The ordered workspace list.</returns>
+        IReadOnlyList<Workspace> GetWorkspaces();
+
+        /// <summary>
+        /// Returns the workspaces visible to <paramref name="callerId"/>; the
+        /// production-page overload falls back to the seeded admin.
+        /// </summary>
+        /// <param name="callerId">The acting identity, or <see langword="null"/> for the fallback.</param>
+        /// <returns>The ordered workspace list.</returns>
+        IReadOnlyList<Workspace> GetWorkspaces(Guid? callerId);
+
+        /// <summary>
+        /// Returns a workspace by its slug key, or <see langword="null"/> when no
+        /// workspace with the given key exists.
+        /// </summary>
+        /// <param name="workspaceKey">The workspace slug.</param>
+        /// <returns>The workspace, or <see langword="null"/>.</returns>
+        Workspace GetWorkspace(string workspaceKey);
+
+        /// <summary>
+        /// Returns the classes of the given workspace, ordered by name. Used by the
+        /// portal's class-tile overview.
+        /// </summary>
+        /// <param name="workspaceId">The workspace id.</param>
+        /// <returns>The ordered class list.</returns>
+        IReadOnlyList<Class> GetClasses(Guid workspaceId);
+
+        /// <summary>
+        /// Returns a single class, or <see langword="null"/> when the id does not
+        /// resolve to a class.
+        /// </summary>
+        /// <param name="classId">The class id.</param>
+        /// <returns>The class, or <see langword="null"/>.</returns>
+        Class GetClass(Guid classId);
+
+        /// <summary>
+        /// Flips the <c>PortalVisible</c> flag of a class — a toggle between the two
+        /// states. The endpoint is the simplest possible surface for the customer
+        /// portal's "publish request type" action; full CRUD on classes stays with
+        /// the operator WebApp.
+        /// </summary>
+        /// <param name="classId">The class id.</param>
+        /// <returns>The updated class, or <see langword="null"/> when the class is unknown.</returns>
+        Class TogglePortalVisible(Guid classId);
+
+        /// <summary>
+        /// Returns the fields of the given class, ordered by name. Used by the
+        /// portal's fields tab on the class detail page.
+        /// </summary>
+        /// <param name="classId">The class id.</param>
+        /// <returns>The active, non-deprecated fields.</returns>
+        IReadOnlyList<Field> GetFields(Guid classId);
+
+        /// <summary>
+        /// Returns the active statuses of the given class, ordered by their display
+        /// name.
+        /// </summary>
+        /// <param name="classId">The class id.</param>
+        /// <returns>The status list.</returns>
+        IReadOnlyList<Status> GetStatuses(Guid classId);
+
+        /// <summary>
+        /// Returns the active priorities of the given class, ordered by their
+        /// configured <c>Order</c> field.
+        /// </summary>
+        /// <param name="classId">The class id.</param>
+        /// <returns>The priority list.</returns>
+        IReadOnlyList<Priority> GetPriorities(Guid classId);
+
+        /// <summary>
+        /// Returns the forms of the given class, ordered by name. The
+        /// <c>PortalTemplate</c> flag identifies forms that surface as
+        /// service-request templates.
+        /// </summary>
+        /// <param name="classId">The class id.</param>
+        /// <returns>The active forms.</returns>
+        IReadOnlyList<Form> GetForms(Guid classId);
+
+        /// <summary>
+        /// Returns the active forms of the given class that are flagged as portal
+        /// templates. Mirrors the helper used internally by the request-type
+        /// projection.
+        /// </summary>
+        /// <param name="classId">The class id.</param>
+        /// <returns>The portal-template forms.</returns>
+        IReadOnlyList<Form> GetPortalTemplates(Guid classId);
+
+        /// <summary>
+        /// Flips the <c>PortalTemplate</c> flag of a form — the per-form
+        /// counterpart of <see cref="TogglePortalVisible"/>. Toggling is
+        /// idempotent: calling twice restores the original state.
+        /// </summary>
+        /// <param name="formId">The form id.</param>
+        /// <returns>The updated form, or <see langword="null"/> when the form is unknown.</returns>
+        Form TogglePortalTemplate(Guid formId);
+
+        /// <summary>
+        /// Creates a new field on the given class. Used by the portal's add-form
+        /// modal. The created field starts active and undeprecated; <c>Created</c>
+        /// and <c>Updated</c> are stamped to <see cref="DateTime.UtcNow"/>.
+        /// </summary>
+        /// <param name="classId">The owning class id.</param>
+        /// <param name="name">The field name (must be non-blank).</param>
+        /// <param name="description">The optional long description.</param>
+        /// <param name="fieldType">The field type.</param>
+        /// <param name="cardinality">The cardinality.</param>
+        /// <param name="required">Whether the field is required.</param>
+        /// <param name="uniqueConstraint">Whether the field is unique.</param>
+        /// <returns>The persisted field.</returns>
+        Field AddField(Guid classId, string name, string description, FieldType fieldType, FieldCardinality cardinality, bool required, bool uniqueConstraint);
+
+        /// <summary>
+        /// Updates the editable properties of a field. The owning class is fixed.
+        /// </summary>
+        /// <param name="fieldId">The field id.</param>
+        /// <param name="name">The new name.</param>
+        /// <param name="description">The new description.</param>
+        /// <param name="fieldType">The new field type.</param>
+        /// <param name="cardinality">The new cardinality.</param>
+        /// <param name="required">Whether the field is required.</param>
+        /// <param name="uniqueConstraint">Whether the field is unique.</param>
+        /// <returns>The updated field, or <see langword="null"/> when the field is unknown.</returns>
+        Field UpdateField(Guid fieldId, string name, string description, FieldType fieldType, FieldCardinality cardinality, bool required, bool uniqueConstraint);
+
+        /// <summary>
+        /// Creates a copy of the field with a new unique name (suffix
+        /// <c>" (copy)"</c> when the original name is still available). The clone
+        /// starts active.
+        /// </summary>
+        /// <param name="fieldId">The source field id.</param>
+        /// <returns>The cloned field, or <see langword="null"/> when the source is unknown.</returns>
+        Field CloneField(Guid fieldId);
+
+        /// <summary>
+        /// Marks a field as deprecated (soft delete). Deprecated fields are hidden
+        /// from the portal's list projection; the underlying row is preserved for
+        /// audit.
+        /// </summary>
+        /// <param name="fieldId">The field id.</param>
+        /// <returns><see langword="true"/> when the field existed and was deprecated.</returns>
+        bool DeleteField(Guid fieldId);
 
         /// <summary>
         /// Submits a new issue against the given request type and (optional) template.

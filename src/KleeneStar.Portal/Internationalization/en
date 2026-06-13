@@ -99,3 +99,10 @@ api.issue.share.title=Issue sharing
 api.issue.watch.title=Issue watch subscription
 api.issue.accept.title=Accept resolution
 api.issue.reject.title=Reject resolution
+
+# Profile page (abgespeckte customer-portal variant)
+profile.title=My Profile
+profile.header=My Profile
+profile.description=Your display data in the service portal. Only the fields shown here are used in the portal.
+profile.field.displayname.label=Display name
+profile.field.email.label=Email address

@@ -10,23 +10,24 @@ using WebExpress.WebUI.WebPage;
 namespace KleeneStar.Portal.WebFragment
 {
     /// <summary>
-    /// My Issue navigation item — links to <see cref="WWW.Mine.Index"/>.
+    /// "Workspaces" navigation item — links to the portal administration
+    /// landing page (<see cref="global::KleeneStar.Portal.WWW.Workspaces.Index"/>),
+    /// which lists the workspaces the calling identity is allowed to administer.
     /// </summary>
     [Section<SectionAppNavigationPrimary>]
     [Scope<IScopePortal>]
     [Cache]
-    public sealed class PortalMineNavFragment : FragmentControlDropdownItemLink
+    public sealed class PortalAdminNavFragment : FragmentControlDropdownItemLink
     {
         /// <summary>
         /// Initializes a new instance of the class.
         /// </summary>
         /// <param name="fragmentContext">The fragment context.</param>
-        public PortalMineNavFragment(IFragmentContext fragmentContext)
+        public PortalAdminNavFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
-            Text = _ => "kleenestar.portal:nav.mine.label";
-            Icon = _ => new IconUser();
-            Uri = _ => PortalHub.GetUri<WWW.Mine.Index>();
+            Text = _ => "kleenestar.portal:nav.admin.label";
+            Icon = _ => new IconSitemap();
         }
 
         /// <summary>
@@ -37,6 +38,7 @@ namespace KleeneStar.Portal.WebFragment
         /// <returns>The rendered link.</returns>
         public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
+            Uri = _ => PortalHub.GetUri<global::KleeneStar.Portal.WWW.Workspaces.Index>();
             return base.Render(renderContext, visualTree);
         }
     }

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using WebExpress.WebCore.WebIcon;
 using WebExpress.WebCore.WebMessage;
 
 namespace KleeneStar.Portal.WWW.Api._1_
@@ -184,7 +185,7 @@ namespace KleeneStar.Portal.WWW.Api._1_
                 Key = requestType.Key,
                 Title = requestType.Title,
                 Description = requestType.Description,
-                IconKey = requestType.IconKey,
+                Icon = requestType.Icon,
                 Templates = [.. requestType.Templates.Select(t => new TemplateDto
                 {
                     Key = t.Key,
@@ -280,8 +281,8 @@ namespace KleeneStar.Portal.WWW.Api._1_
             /// <summary>Gets or sets the short description.</summary>
             public string Description { get; init; }
 
-            /// <summary>Gets or sets the icon key.</summary>
-            public string IconKey { get; init; }
+            /// <summary>Gets or sets the icon.</summary>
+            public IIcon Icon { get; init; }
 
             /// <summary>Gets or sets the templates of the request type.</summary>
             public IReadOnlyList<TemplateDto> Templates { get; init; }

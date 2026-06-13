@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using WebExpress.WebCore.WebIcon;
 
 namespace KleeneStar.Portal.WebDomain
 {
@@ -18,13 +19,7 @@ namespace KleeneStar.Portal.WebDomain
         public string Description { get; init; }
 
         /// <inheritdoc/>
-        public string IconKey { get; init; }
-
-        /// <inheritdoc/>
-        public string Tone { get; init; }
-
-        /// <inheritdoc/>
-        public string Foreground { get; init; }
+        public IIcon Icon { get; init; }
 
         /// <inheritdoc/>
         public IReadOnlyList<ITemplate> Templates { get; init; } = [];

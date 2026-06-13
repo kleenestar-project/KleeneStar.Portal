@@ -752,5 +752,125 @@ namespace KleeneStar.Portal.Test.WebManager
             Assert.Equal("Gina Globex", members[2].Name);
             Assert.Equal("Operator Sam", members[3].Name);
         }
+
+        /// <summary>
+        /// Workspace list is tenant-isolated: an Acme member sees the Acme
+        /// workspace; the seeded admin (also Acme) sees it too; the tenant-less
+        /// operator identity sees every active workspace.
+        /// </summary>
+        [Fact]
+        public void GetWorkspaces_RespectsTenantScope()
+        {
+            var manager = Seed(nameof(GetWorkspaces_RespectsTenantScope));
+
+            var acmeView = manager.GetWorkspaces(PortalManager.FallbackIdentityId);
+            var globexView = manager.GetWorkspaces(GlobexMemberIdentityId);
+            var operatorView = manager.GetWorkspaces(TenantlessIdentityId);
+
+            Assert.Single(acmeView);
+            Assert.Equal("SD", acmeView[0].Key);
+
+            Assert.Single(globexView);
+            Assert.Equal("SDG", globexView[0].Key);
+
+            // operator identity (no tenant) sees every active workspace
+            Assert.Equal(2, operatorView.Count);
+        }
+
+        /// <summary>
+        /// Class detail is resolved by id and the portal-visible toggle flips
+        /// the flag in place. The flag round-trips through the manager.
+        /// </summary>
+        [Fact]
+        public void GetClass_AndTogglePortalVisible_RoundTrip()
+        {
+            var manager = Seed(nameof(GetClass_AndTogglePortalVisible_RoundTrip));
+
+            var cls = manager.GetClass(IncidentClassId);
+            Assert.NotNull(cls);
+            Assert.True(cls.PortalVisible);
+
+            // toggle off
+            var after = manager.TogglePortalVisible(IncidentClassId);
+            Assert.False(after!.PortalVisible);
+
+            // toggle back on
+            var afterAgain = manager.TogglePortalVisible(IncidentClassId);
+            Assert.True(afterAgain!.PortalVisible);
+        }
+
+        /// <summary>
+        /// Field CRUD: add a field, list it, update it, clone it, then soft-delete
+        /// it via the deprecated flag.
+        /// </summary>
+        [Fact]
+        public void Field_AddListUpdateCloneDelete_RoundTrip()
+        {
+            var manager = Seed(nameof(Field_AddListUpdateCloneDelete_RoundTrip));
+
+            var initial = manager.GetFields(IncidentClassId);
+            // the seed provisions two fields (Status, Priority)
+            Assert.Equal(2, initial.Count);
+
+            var created = manager.AddField(IncidentClassId, "Email", "Contact e-mail address.", FieldType.Text, FieldCardinality.Single, required: true, uniqueConstraint: false);
+            Assert.NotNull(created);
+            Assert.Equal("Email", created.Name);
+            Assert.True(created.Required);
+
+            var listed = manager.GetFields(IncidentClassId);
+            Assert.Equal(3, listed.Count);
+            Assert.Contains(listed, f => f.Id == created.Id);
+
+            var updated = manager.UpdateField(created.Id, "E-mail", "Primary e-mail.", FieldType.Text, FieldCardinality.Multiple, required: false, uniqueConstraint: true);
+            Assert.NotNull(updated);
+            Assert.Equal("E-mail", updated!.Name);
+            Assert.Equal(FieldCardinality.Multiple, updated.Cardinality);
+            Assert.False(updated.Required);
+            Assert.True(updated.Unique);
+
+            var clone = manager.CloneField(created.Id);
+            Assert.NotNull(clone);
+            Assert.Equal("E-mail (copy)", clone!.Name);
+
+            var removed = manager.DeleteField(created.Id);
+            Assert.True(removed);
+
+            var afterDelete = manager.GetFields(IncidentClassId);
+            Assert.DoesNotContain(afterDelete, f => f.Id == created.Id);
+        }
+
+        /// <summary>
+        /// Reserved field names are rejected.
+        /// </summary>
+        [Fact]
+        public void AddField_RejectsReservedNames()
+        {
+            var manager = Seed(nameof(AddField_RejectsReservedNames));
+
+            Assert.Throws<InvalidOperationException>(() =>
+                manager.AddField(IncidentClassId, "admin", "system reserved", FieldType.Text, FieldCardinality.Single, false, false));
+        }
+
+        /// <summary>
+        /// Form portal-template toggle round-trips.
+        /// </summary>
+        [Fact]
+        public void TogglePortalTemplate_RoundTrips()
+        {
+            var manager = Seed(nameof(TogglePortalTemplate_RoundTrips));
+
+            // the seed provisions two forms (Self-Service Form, Resolver Form);
+            // pick the first one and round-trip the toggle.
+            var forms = manager.GetForms(IncidentClassId);
+            Assert.Equal(2, forms.Count);
+            var formId = forms[0].Id;
+            var before = forms[0].PortalTemplate;
+
+            var flipped = manager.TogglePortalTemplate(formId);
+            Assert.NotEqual(before, flipped!.PortalTemplate);
+
+            var flippedAgain = manager.TogglePortalTemplate(formId);
+            Assert.Equal(before, flippedAgain!.PortalTemplate);
+        }
     }
 }

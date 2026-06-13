@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using WebExpress.WebCore.WebIcon;
 
 namespace KleeneStar.Portal.WebDomain
 {
@@ -26,20 +27,11 @@ namespace KleeneStar.Portal.WebDomain
         string Description { get; }
 
         /// <summary>
-        /// Gets the icon glyph rendered on the tile. Mirrors the prototype's per-tile
-        /// pictograms (lightning, plus, cog, info, file, status).
+        /// Gets the icon glyph rendered on the tile. Sourced directly from the
+        /// underlying <c>Class.Icon</c> entity; <see langword="null"/> when the
+        /// class has no icon set.
         /// </summary>
-        string IconKey { get; }
-
-        /// <summary>
-        /// Gets the soft tone color (background of the icon chip) in CSS notation.
-        /// </summary>
-        string Tone { get; }
-
-        /// <summary>
-        /// Gets the foreground color used for the icon glyph.
-        /// </summary>
-        string Foreground { get; }
+        IIcon Icon { get; }
 
         /// <summary>
         /// Gets the templates available beneath this request type.

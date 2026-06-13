@@ -1,4 +1,5 @@
 using KleeneStar.Core;
+using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Model.Entities;
 using KleeneStar.Portal.WebDomain;
@@ -56,19 +57,6 @@ namespace KleeneStar.Portal.WebManager
         public static readonly Guid FallbackIdentityId = Guid.Parse("77087646-B13A-44B1-9BAC-6E66443CEDFD");
 
         /// <summary>
-        /// Tone/foreground pairs (oklch) cycled over the request-type catalog so each
-        /// tile gets a stable accent without persisting presentation data.
-        /// </summary>
-        private static readonly (string Tone, string Foreground)[] _palette =
-        [
-            ("oklch(96% 0.05 25)",  "oklch(50% 0.18 25)"),
-            ("oklch(96% 0.05 252)", "oklch(48% 0.18 252)"),
-            ("oklch(96% 0.04 75)",  "oklch(50% 0.16 75)"),
-            ("oklch(96% 0.04 155)", "oklch(48% 0.14 155)"),
-            ("oklch(96% 0.04 285)", "oklch(48% 0.16 285)"),
-            ("oklch(96% 0.04 320)", "oklch(48% 0.18 320)")
-        ];
-
         /// <inheritdoc/>
         public event EventHandler<IIssue> IssueCreated;
         /// <inheritdoc/>
@@ -130,7 +118,7 @@ namespace KleeneStar.Portal.WebManager
         {
             var classes = GetPortalClasses();
 
-            return [.. classes.Select((cls, index) => BuildRequestType(cls, index))];
+            return [.. classes.Select(cls => BuildRequestType(cls))];
         }
 
         /// <inheritdoc/>
@@ -156,7 +144,7 @@ namespace KleeneStar.Portal.WebManager
         {
             var classes = GetPortalClasses();
             var requestTypes = classes
-                .Select((cls, index) => (cls.Id, RequestType: BuildRequestType(cls, index)))
+                .Select(cls => (cls.Id, RequestType: BuildRequestType(cls)))
                 .ToDictionary(x => x.Id, x => x.RequestType);
 
             // load the share/watch relations once and group them by object so the
@@ -542,6 +530,231 @@ namespace KleeneStar.Portal.WebManager
         {
             GC.SuppressFinalize(this);
         }
+        /// <inheritdoc/>
+        public IReadOnlyList<Workspace> GetWorkspaces()
+        {
+            return GetWorkspaces(FallbackIdentityId);
+        }
+
+        /// <inheritdoc/>
+        public IReadOnlyList<Workspace> GetWorkspaces(Guid? callerId)
+        {
+            var me = callerId ?? FallbackIdentityId;
+            var meIdentity = CoreHub.IdentityManager.GetIdentity(me);
+
+            var workspaces = CoreHub.WorkspaceManager
+                .GetWorkspaces(new Query<Workspace>())
+                .Where(w => w.State == WorkspaceState.Active);
+
+            // tenant-scoped: an identity with a tenant only sees workspaces that
+            // share one of its tenants. Operator-side identities (no tenant)
+            // see every active workspace — useful for an internal "Settings"
+            // view of the portal.
+            if (meIdentity?.TenantId is { } callerTenantId)
+            {
+                workspaces = workspaces
+                    .Where(w => w.Tenants != null && w.Tenants.Any(t => t.Id == callerTenantId));
+            }
+
+            return [.. workspaces.OrderBy(w => w.Name, StringComparer.OrdinalIgnoreCase)];
+        }
+
+        /// <inheritdoc/>
+        public Workspace GetWorkspace(string workspaceKey)
+        {
+            if (string.IsNullOrWhiteSpace(workspaceKey))
+            {
+                return null;
+            }
+
+            return CoreHub.WorkspaceManager
+                .GetWorkspaces(new Query<Workspace>())
+                .FirstOrDefault(w => string.Equals(w.Key, workspaceKey, StringComparison.OrdinalIgnoreCase));
+        }
+
+        /// <inheritdoc/>
+        public IReadOnlyList<Class> GetClasses(Guid workspaceId)
+        {
+            return [.. CoreHub.ClassManager
+                .GetClasses(new Query<Class>().WhereEquals(x => x.WorkspaceId, workspaceId))
+                .Where(c => c.State == ClassState.Active)
+                .OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase)];
+        }
+
+        /// <inheritdoc/>
+        public Class GetClass(Guid classId)
+        {
+            return CoreHub.ClassManager.GetClass(classId);
+        }
+
+        /// <inheritdoc/>
+        public Class TogglePortalVisible(Guid classId)
+        {
+            var cls = CoreHub.ClassManager.GetClass(classId);
+            if (cls is null)
+            {
+                return null;
+            }
+
+            cls.PortalVisible = !cls.PortalVisible;
+            cls.Updated = DateTime.UtcNow;
+            CoreHub.ClassManager.Update(cls);
+
+            return cls;
+        }
+
+        /// <inheritdoc/>
+        public IReadOnlyList<Field> GetFields(Guid classId)
+        {
+            return [.. CoreHub.FieldManager
+                .GetFields(new ClassIdParameter(classId))
+                .Where(f => !f.Deprecated && f.State == FieldState.Active)
+                .OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase)];
+        }
+
+        /// <inheritdoc/>
+        public IReadOnlyList<Status> GetStatuses(Guid classId)
+        {
+            return [.. CoreHub.StatusManager
+                .GetStatuses(new ClassIdParameter(classId))
+                .Where(s => s.State == StatusState.Active)
+                .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)];
+        }
+
+        /// <inheritdoc/>
+        public IReadOnlyList<Priority> GetPriorities(Guid classId)
+        {
+            return [.. CoreHub.PriorityManager
+                .GetPriorities(new ClassIdParameter(classId))
+                .Where(p => p.State == PriorityState.Active)
+                .OrderBy(p => p.Order)
+                .ThenBy(p => p.Name, StringComparer.OrdinalIgnoreCase)];
+        }
+
+        /// <inheritdoc/>
+        public IReadOnlyList<Form> GetForms(Guid classId)
+        {
+            return [.. CoreHub.FormManager
+                .GetForms(new ClassIdParameter(classId))
+                .Where(f => f.State == FormState.Active)
+                .OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase)];
+        }
+
+        /// <inheritdoc/>
+        public IReadOnlyList<Form> GetPortalTemplates(Guid classId)
+        {
+            return GetPortalTemplatesList(classId);
+        }
+
+        /// <inheritdoc/>
+        public Form TogglePortalTemplate(Guid formId)
+        {
+            var form = CoreHub.FormManager
+                .GetForms(new Query<Form>())
+                .FirstOrDefault(f => f.Id == formId);
+            if (form is null)
+            {
+                return null;
+            }
+
+            form.PortalTemplate = !form.PortalTemplate;
+            form.Updated = DateTime.UtcNow;
+            CoreHub.FormManager.Update(form);
+
+            return form;
+        }
+
+        /// <inheritdoc/>
+        public Field AddField(Guid classId, string name, string description, FieldType fieldType, FieldCardinality cardinality, bool required, bool uniqueConstraint)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(name);
+            var cls = CoreHub.ClassManager.GetClass(classId)
+                ?? throw new InvalidOperationException($"Class '{classId}' not found.");
+
+            if (FieldManager.ReservedFieldNames.Any(r => string.Equals(r, name, StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new InvalidOperationException($"Field name '{name}' is reserved.");
+            }
+
+            var now = DateTime.UtcNow;
+            var field = new Field
+            {
+                Name = name,
+                Description = description ?? string.Empty,
+                ClassId = cls.Id,
+                FieldType = fieldType,
+                Cardinality = cardinality,
+                Required = required,
+                Unique = uniqueConstraint,
+                Deprecated = false,
+                State = FieldState.Active,
+                Created = now,
+                Updated = now
+            };
+
+            CoreHub.FieldManager.Add(field);
+            return field;
+        }
+
+        /// <inheritdoc/>
+        public Field UpdateField(Guid fieldId, string name, string description, FieldType fieldType, FieldCardinality cardinality, bool required, bool uniqueConstraint)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+            var field = CoreHub.FieldManager.GetField(fieldId);
+            if (field is null)
+            {
+                return null;
+            }
+
+            field.Name = name;
+            field.Description = description ?? string.Empty;
+            field.FieldType = fieldType;
+            field.Cardinality = cardinality;
+            field.Required = required;
+            field.Unique = uniqueConstraint;
+            field.Updated = DateTime.UtcNow;
+
+            CoreHub.FieldManager.Update(field);
+            return field;
+        }
+
+        /// <inheritdoc/>
+        public Field CloneField(Guid fieldId)
+        {
+            var source = CoreHub.FieldManager.GetField(fieldId);
+            if (source is null)
+            {
+                return null;
+            }
+
+            var baseName = source.Name;
+            var candidate = baseName + " (copy)";
+            var suffix = 2;
+            while (CoreHub.FieldManager.GetFields(new ClassIdParameter(source.ClassId)).Any(f => string.Equals(f.Name, candidate, StringComparison.OrdinalIgnoreCase)))
+            {
+                candidate = $"{baseName} (copy {suffix++})";
+            }
+
+            return AddField(source.ClassId, candidate, source.Description, source.FieldType, source.Cardinality, source.Required, source.Unique);
+        }
+
+        /// <inheritdoc/>
+        public bool DeleteField(Guid fieldId)
+        {
+            var field = CoreHub.FieldManager.GetField(fieldId);
+            if (field is null)
+            {
+                return false;
+            }
+
+            field.Deprecated = true;
+            field.Updated = DateTime.UtcNow;
+            CoreHub.FieldManager.Update(field);
+
+            return true;
+        }
+
         /// <summary>
         /// Adds or removes the watch relationship between the current identity and the
         /// addressed issue and raises the corresponding events.
@@ -647,11 +860,10 @@ namespace KleeneStar.Portal.WebManager
         /// including the portal-flagged forms as templates.
         /// </summary>
         /// <param name="cls">The class to project.</param>
-        /// <param name="index">The stable catalog index used for the accent palette.</param>
         /// <returns>The request-type projection.</returns>
-        private static RequestType BuildRequestType(Class cls, int index)
+        private static RequestType BuildRequestType(Class cls)
         {
-            var templates = GetPortalTemplates(cls.Id)
+            var templates = GetPortalTemplatesList(cls.Id)
                 .Select(f => new TemplateProjection
                 {
                     Key = Slug(f.Name),
@@ -661,26 +873,22 @@ namespace KleeneStar.Portal.WebManager
                 .Cast<ITemplate>()
                 .ToList();
 
-            var (tone, foreground) = _palette[((index % _palette.Length) + _palette.Length) % _palette.Length];
-
             return new RequestType
             {
                 Key = Slug(cls.Name),
                 Title = cls.Name,
                 Description = cls.Description,
-                IconKey = IconKeyFromUri(cls.Icon?.Uri?.ToString()),
-                Tone = tone,
-                Foreground = foreground,
+                Icon = cls.Icon,
                 Templates = templates
             };
         }
-
         /// <summary>
-        /// Returns the active forms of the class that are flagged as portal templates.
+        /// Returns the active forms of the given class that are flagged as portal
+        /// templates. Internal helper used by the request-type projection.
         /// </summary>
         /// <param name="classId">The class id.</param>
         /// <returns>The portal-template forms.</returns>
-        private static List<Form> GetPortalTemplates(Guid classId)
+        private static List<Form> GetPortalTemplatesList(Guid classId)
         {
             return [.. CoreHub.FormManager
                 .GetForms(new ClassIdParameter(classId))
@@ -760,7 +968,7 @@ namespace KleeneStar.Portal.WebManager
                 PriorityField = fields.FirstOrDefault(f => f.FieldType == FieldType.Priority),
                 Statuses = statuses,
                 Categories = categories,
-                Templates = GetPortalTemplates(cls.Id)
+                Templates = GetPortalTemplatesList(cls.Id)
             };
         }
 
@@ -774,7 +982,7 @@ namespace KleeneStar.Portal.WebManager
         private static Issue BuildIssue(ObjectEntity entity, Class cls)
         {
             var context = BuildClassContext(cls);
-            var requestType = BuildRequestType(cls, 0);
+            var requestType = BuildRequestType(cls);
             var shares = CoreHub.ShareManager.GetShares(entity.Id).ToList();
             var watchers = CoreHub.WatcherManager.GetWatchers(entity.Id).ToList();
             var comments = CoreHub.CommentManager.GetComments(entity.Id).ToList();
@@ -1202,27 +1410,6 @@ namespace KleeneStar.Portal.WebManager
                 .Max();
 
             return $"{prefix}-{existing + 1}";
-        }
-
-        /// <summary>
-        /// Derives the portal icon key from an icon URI — the file name without
-        /// extension (e.g. <c>incident</c> from <c>/kleenestar/assets/icons/incident.svg</c>).
-        /// </summary>
-        /// <param name="uri">The icon URI, or <see langword="null"/>.</param>
-        /// <returns>The icon key, or <c>status</c> as the neutral fallback.</returns>
-        private static string IconKeyFromUri(string uri)
-        {
-            if (string.IsNullOrWhiteSpace(uri))
-            {
-                return "status";
-            }
-
-            var fileName = uri.Split('/').LastOrDefault() ?? string.Empty;
-            var dot = fileName.LastIndexOf('.');
-
-            var key = dot > 0 ? fileName[..dot] : fileName;
-
-            return string.IsNullOrWhiteSpace(key) ? "status" : key.ToLowerInvariant();
         }
 
         /// <summary>

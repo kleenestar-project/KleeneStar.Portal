@@ -99,3 +99,10 @@ api.issue.share.title=Vorgangs-Freigabe
 api.issue.watch.title=Vorgangs-Beobachtung
 api.issue.accept.title=Lösung akzeptieren
 api.issue.reject.title=Lösung ablehnen
+
+# Profile page (abgespeckte Kundenportal-Variante)
+profile.title=Mein Profil
+profile.header=Mein Profil
+profile.description=Deine Anzeigedaten im Service-Portal. Nur die hier sichtbaren Felder werden im Portal verwendet.
+profile.field.displayname.label=Anzeigename
+profile.field.email.label=E-Mail-Adresse
