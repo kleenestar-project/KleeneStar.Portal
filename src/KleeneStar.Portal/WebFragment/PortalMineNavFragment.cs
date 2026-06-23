@@ -15,7 +15,7 @@ namespace KleeneStar.Portal.WebFragment
     [Section<SectionAppNavigationPrimary>]
     [Scope<IScopePortal>]
     [Cache]
-    public sealed class PortalMineNavFragment : FragmentControlDropdownItemLink
+    public sealed class PortalMineNavFragment : FragmentControlNavigationItemLink
     {
         /// <summary>
         /// Initializes a new instance of the class.
