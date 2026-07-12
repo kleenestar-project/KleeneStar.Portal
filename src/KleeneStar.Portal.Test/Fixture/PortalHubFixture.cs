@@ -61,7 +61,7 @@ namespace KleeneStar.Portal.Test
         {
             ModelHub.DatabaseConfig = new DbConfig
             {
-                Assembly = "KleeneStar.Protal.Test",
+                Assembly = "KleeneStar.Portal.Test",
                 ConnectionString = connectionString
             };
 
