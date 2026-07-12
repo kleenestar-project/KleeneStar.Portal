@@ -1,4 +1,5 @@
 using WebExpress.WebApp.WebControl;
+using WebExpress.WebApp.WebData;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
@@ -27,10 +28,9 @@ namespace KleeneStar.Portal.WebFragment
         /// <summary>
         /// Gets the quick filter control for the REST-based issue query.
         /// </summary>
-        public ControlRestQuickfilter Quickfilter { get; } = new ControlRestQuickfilter(ContentId)
+        public ControlDataQuickfilter Quickfilter { get; } = new ControlDataQuickfilter(ContentId)
         {
-            RestUri = _ => PortalHub.GetUri<global::KleeneStar.Portal.WWW.Api._1_.Issues.Mine.Quickfilter>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(PortalHub.GetUri<global::KleeneStar.Portal.WWW.Api._1_.Issues.Mine.Quickfilter>().ToString())};
 
         /// <summary>
         /// Initializes a new instance of the class.

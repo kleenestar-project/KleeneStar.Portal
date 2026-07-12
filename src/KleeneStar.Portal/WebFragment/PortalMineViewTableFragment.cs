@@ -1,4 +1,5 @@
 using WebExpress.WebApp.WebControl;
+using WebExpress.WebApp.WebData;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
@@ -25,10 +26,9 @@ namespace KleeneStar.Portal.WebFragment
         /// <summary>
         /// Gets the table that displays the calling identity's issues.
         /// </summary>
-        public ControlRestTable Table { get; } = new ControlRestTable()
+        public ControlDataTable Table { get; } = new ControlDataTable()
         {
-            RestUri = _ => PortalHub.GetUri<global::KleeneStar.Portal.WWW.Api._1_.Issues.Mine.Table>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.TableData(PortalHub.GetUri<global::KleeneStar.Portal.WWW.Api._1_.Issues.Mine.Table>().ToString())};
 
         /// <summary>
         /// Initializes a new instance of the class.
