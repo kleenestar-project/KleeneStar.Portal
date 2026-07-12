@@ -1,0 +1,108 @@
+# en-US language resource file
+plugin.name=KleeneStar.Portal
+plugin.description=Customer portal plugin for the KleeneStar platform.
+
+app.name=KleeneStar Service Portal
+app.label=KleeneStar Service Portal
+app.description=The KleeneStar customer portal — the simple way to report, track, and resolve requests.
+
+# Page titles
+home.title=Service Portal
+login.title=Sign in
+mine.title=My Issues
+org.title=Organization
+
+# Top navigation labels
+nav.home.label=Home
+nav.mine.label=My Issues
+nav.org.label=Organization
+
+# Issue lifecycle states
+state.open=Open
+state.in-progress=In Progress
+state.waiting=Waiting on Requester
+state.resolved=Resolved
+state.closed=Closed
+
+# Common UI labels
+issue.description.label=Description
+issue.history.label=History
+issue.details.label=Details
+issue.shared-with.label=Shared with
+issue.watchers.label=Watchers
+issue.requester.label=Requester
+issue.assignee.label=Assigned to
+issue.created.label=Created
+issue.updated.label=Updated
+issue.priority.label=Priority
+issue.type.label=Type
+issue.approval-required.label=Approval required
+
+# Home page
+home.headline=How can we help?
+home.headline.with-name=How can we help, {0}?
+home.request-types.heading=REQUEST TYPES
+home.recent.heading=RECENTLY BY YOU
+home.recent.empty=No requests yet.
+
+# Mine page
+mine.headline=My Issues
+mine.description=Requests you created or where you are involved.
+mine.empty=No matching issues — try different filters or start a new request.
+
+# Organization page
+org.headline=Issues in the organization
+org.description=All requests you have access to.
+org.empty=No issues visible.
+
+# Request type tiles
+request-type.templates.count={0} templates
+
+# Issue detail page
+issue.not-found=Issue '{0}' was not found or is not shared with you.
+issue.header.summary={0} · {1} · {2} · {3} · by {4} · assigned to {5}
+issue.resolution.banner=Resolution proposed. Please review and confirm that your request is resolved.
+issue.description.heading=DESCRIPTION
+issue.history.entry.singular=entry
+issue.history.entry.plural=entries
+issue.history.heading=HISTORY · {0} {1}
+issue.system=System
+issue.details.heading=DETAILS
+issue.note.label=Note
+issue.shared-with.heading=SHARED WITH ({0})
+issue.watchers.heading=WATCHERS ({0})
+
+# Common values
+common.na=—
+common.separator.value= · {0}
+
+# Relative time
+relative.ago.prefix=ago
+relative.minutes=min.
+relative.hours=hrs.
+relative.days=days
+relative.weeks=weeks
+
+# Table headers
+table.key=Key
+table.title=Title
+table.status=Status
+table.priority=Priority
+table.updated=Updated
+
+# REST API endpoint titles
+api.requesttypes.title=Request type catalog
+api.issues.title=Issues
+api.issue.title=Issue
+api.issue.comments.title=Issue comments
+api.issue.share.title=Issue sharing
+api.issue.watch.title=Issue watch subscription
+api.issue.accept.title=Accept resolution
+api.issue.reject.title=Reject resolution
+
+# Profile page (abgespeckte customer-portal variant)
+profile.title=My Profile
+profile.header=My Profile
+profile.description=Your display data in the service portal. Only the fields shown here are used in the portal.
+profile.field.displayname.label=Display name
+profile.field.email.label=Email address
