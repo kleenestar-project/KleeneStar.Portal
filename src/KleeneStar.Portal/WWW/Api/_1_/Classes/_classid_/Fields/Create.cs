@@ -60,7 +60,7 @@ namespace KleeneStar.Portal.WWW.Api._1_.Classes._classid_.Fields
                     payload.Required ?? false,
                     payload.Unique ?? false);
 
-                return PortalAdminApi.Json(new
+                return global::KleeneStar.Portal.WWW.Api._1_.PortalApi.Created(new
                 {
                     id = field.Id,
                     name = field.Name,
