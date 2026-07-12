@@ -12,9 +12,9 @@ using WebExpress.WebUI.WebControl;
 namespace KleeneStar.Portal.WWW.Workspaces._workspacekey_.Classes
 {
     /// <summary>
-    /// Class list page — a tabular overview of the workspace's classes with a
-    /// portal-visible toggle on each row. The <c>{workspacekey}</c> URL segment
-    /// is bound by <see cref="WorkspaceKeySegmentAttribute"/>.
+    /// Class list page — a tabular overview of the workspace's classes. The
+    /// <c>{workspacekey}</c> URL segment is bound by
+    /// <see cref="WorkspaceKeySegmentAttribute"/>.
     /// </summary>
     [WebIcon<RequestTypeIcon>]
     [WorkspaceKeySegment]
