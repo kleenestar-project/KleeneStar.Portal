@@ -47,7 +47,7 @@ namespace KleeneStar.Portal.WWW.Api._1_.Classes._classid_.Fields._fieldid_
                 return PortalAdminApi.NotFound();
             }
 
-            return PortalAdminApi.Json(new
+            return global::KleeneStar.Portal.WWW.Api._1_.PortalApi.Created(new
             {
                 id = clone.Id,
                 name = clone.Name
