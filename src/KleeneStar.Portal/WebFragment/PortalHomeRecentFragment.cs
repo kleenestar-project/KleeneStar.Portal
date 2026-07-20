@@ -1,8 +1,5 @@
 using KleeneStar.Portal.WebDomain;
 using KleeneStar.Portal.WebManager;
-using KleeneStar.Portal.WebScope;
-using System;
-using System.Collections.Generic;
 using System.Linq;
 using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.Internationalization;
@@ -69,11 +66,17 @@ namespace KleeneStar.Portal.WebFragment
         private static string TranslateKey(string key) => I18N.Translate(key);
 
         /// <summary>
-        /// Convert the fragment to HTML.
+        /// Renders the control as an HTML node.
         /// </summary>
-        /// <param name="renderContext">The context in which the fragment is rendered.</param>
-        /// <param name="visualTree">The visual tree used for rendering the fragment.</param>
-        /// <returns>The rendered HTML node.</returns>
+        /// <param name="renderContext">
+        /// The context in which the control is rendered.
+        /// </param>
+        /// <param name="visualTree">
+        /// The visual tree representing the control's structure.
+        /// </param>
+        /// <returns>
+        /// An HTML node representing the rendered control.
+        /// </returns>
         public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
             return base.Render(renderContext, visualTree);
