@@ -33,6 +33,8 @@ namespace KleeneStar.Portal.Test
             ("_kindDashboardManager", typeof(KindDashboardManager)),
             ("_tenantManager",    typeof(TenantManager)),
             ("_navigatorLinkManager", typeof(NavigatorLinkManager)),
+            ("_maintenanceManager", typeof(MaintenanceManager)),
+            ("_customQuickfilterManager", typeof(CustomQuickfilterManager)),
             ("_identityManager",  typeof(IdentityManager)),
             ("_groupManager",     typeof(GroupManager)),
             ("_slaManager",       typeof(SlaManager)),
