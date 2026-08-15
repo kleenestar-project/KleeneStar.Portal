@@ -50,6 +50,8 @@ namespace KleeneStar.Portal.Test
             ("_objectViewManager",typeof(ObjectViewManager)),
             ("_objectLinkManager",typeof(ObjectLinkManager)),
             ("_sessionManager",   typeof(SessionManager)),
+            ("_identitySessionManager", typeof(IdentitySessionManager)),
+            ("_accessTokenManager", typeof(AccessTokenManager)),
             ("_savedSearchManager",typeof(SavedSearchManager)),
             ("_sprintManager",    typeof(SprintManager)),
         ];
