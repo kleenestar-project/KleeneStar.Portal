@@ -1,3 +1,4 @@
+using KleeneStar.Model.Entities;
 using KleeneStar.Portal.WebManager;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
@@ -13,9 +14,11 @@ namespace KleeneStar.Portal.WWW.Api._1_.Issues._issuekey_
     /// </summary>
     /// <remarks>
     /// The body carries <c>text</c> (required) and <c>visibility</c> (<c>public</c> —
-    /// the default — or <c>internal-team</c>). The core comment model does not persist
-    /// a visibility flag yet, so the value is accepted for forward compatibility but
-    /// every stored comment is public (see the roadmap document).
+    /// the default — or <c>internal-team</c>). The visibility is persisted on the core
+    /// <c>Comment</c> row and narrows who sees the entry in the portal timeline: an
+    /// <c>internal-team</c> comment reaches the assigned service group and the requester
+    /// only. An unknown token is rejected with <c>400</c> rather than widened, so a
+    /// caller aiming at <c>internal-team</c> never publishes to the requester by typo.
     /// </remarks>
     [Title("kleenestar.portal:api.issue.comments.title")]
     [Cache]
@@ -42,7 +45,8 @@ namespace KleeneStar.Portal.WWW.Api._1_.Issues._issuekey_
         /// <param name="request">The incoming request carrying the JSON body.</param>
         /// <returns>
         /// <c>201 Created</c> with the updated issue projection, <c>400</c> when the
-        /// text is missing, or <c>404</c> when the issue is not visible.
+        /// text is missing or the visibility is unknown, or <c>404</c> when the issue is
+        /// not visible.
         /// </returns>
         [Method(RequestMethod.POST)]
         public IResponse Create(IRequest request)
@@ -53,10 +57,15 @@ namespace KleeneStar.Portal.WWW.Api._1_.Issues._issuekey_
                 return PortalApi.Error("'text' is required.");
             }
 
+            if (!CommentVisibilityExtensions.IsKnownToken(payload.Visibility))
+            {
+                return PortalApi.Error($"'visibility' must be '{CommentVisibilityExtensions.PublicToken}' or '{CommentVisibilityExtensions.InternalTeamToken}'.");
+            }
+
             var issue = _portalManager.AddComment(
                 PortalApi.GetIssueKey(request),
                 payload.Text,
-                payload.Visibility ?? "public");
+                payload.Visibility ?? CommentVisibilityExtensions.PublicToken);
 
             return issue is null
                 ? PortalApi.NotFound()

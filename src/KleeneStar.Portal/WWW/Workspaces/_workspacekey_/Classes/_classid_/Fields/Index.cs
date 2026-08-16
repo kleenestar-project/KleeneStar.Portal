@@ -6,6 +6,7 @@ using KleeneStar.Portal.WebScope;
 using System;
 using System.Linq;
 using WebExpress.WebApp.WebPage;
+using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebPage;
 using WebExpress.WebUI.WebControl;
@@ -48,6 +49,9 @@ namespace KleeneStar.Portal.WWW.Workspaces._workspacekey_.Classes._classid_.Fiel
 
         /// <summary>Resource key for the description column.</summary>
         public const string DescriptionColumnResource = "kleenestar.portal:admin.fields.column.description";
+
+        /// <summary>Resource key for the delete confirmation; takes the field name.</summary>
+        public const string DeleteConfirmResource = "kleenestar.portal:admin.fields.action.delete-confirm";
 
         /// <summary>Resource key for the actions column.</summary>
         public const string ActionsColumnResource = "kleenestar.portal:admin.fields.column.actions";
@@ -96,7 +100,8 @@ namespace KleeneStar.Portal.WWW.Workspaces._workspacekey_.Classes._classid_.Fiel
                 return;
             }
 
-            visualTree.Title = $"{cls.Name} — {HeadlineResource}";
+            // see the classes index: the key has to be resolved before it is prefixed
+            visualTree.Title = $"{cls.Name} — {I18N.Translate(renderContext, HeadlineResource)}";
             visualTree.Content.MainPanel.Headline.Title = HeadlineResource;
 
             // add-field button: opens a modal that posts to the create REST endpoint.
@@ -193,7 +198,8 @@ namespace KleeneStar.Portal.WWW.Workspaces._workspacekey_.Classes._classid_.Fiel
                     Uri = _ => deleteUri,
                     Method = _ => WebExpress.WebCore.WebMessage.RequestMethod.DELETE
                 };
-                deleteForm.Conformation = _ => new ControlText() { Text = _ => $"\"{capturedName}\" löschen?" };
+                var deleteConfirmation = I18N.Translate(renderContext, DeleteConfirmResource, capturedName);
+                deleteForm.Conformation = _ => new ControlText() { Text = _ => deleteConfirmation };
 
                 var descriptionText = new ControlText()
                 {

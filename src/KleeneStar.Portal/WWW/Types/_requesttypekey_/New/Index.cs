@@ -7,6 +7,7 @@ using KleeneStar.Portal.WebScope;
 using System;
 using System.Linq;
 using WebExpress.WebApp.WebPage;
+using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebPage;
 using WebExpress.WebUI.WebControl;
@@ -41,7 +42,7 @@ namespace KleeneStar.Portal.WWW.Types._requesttypekey_.New
         /// <summary>Resource key for the request-type unavailable message.</summary>
         public const string NotAvailableResource = "kleenestar.portal:create.unavailable";
 
-        /// <summary>Resource key for the priority prefix (P1..P4).</summary>
+        /// <summary>Resource key for the priority label pattern (P1..P4); takes the level.</summary>
         public const string PriorityPrefixResource = "kleenestar.portal:create.priority";
 
         private readonly IPortalManager _portalManager;
@@ -127,12 +128,17 @@ namespace KleeneStar.Portal.WWW.Types._requesttypekey_.New
             {
                 Label = _ => UrgencyLabelResource
             };
+            // the label is resolved and formatted here rather than composed from the key:
+            // appending the level to the key produced a string no resource matched, so the
+            // combo listed the raw "kleenestar.portal:create.priority 1" to the customer.
+            string Priority(int level) => I18N.Translate(renderContext, PriorityPrefixResource, level);
+
             urgency.Add
             (
-                new ControlFormItemInputComboItem() { Value = _ => "P1", Text = _ => $"{PriorityPrefixResource} 1" },
-                new ControlFormItemInputComboItem() { Value = _ => "P2", Text = _ => $"{PriorityPrefixResource} 2" },
-                new ControlFormItemInputComboItem() { Value = _ => "P3", Text = _ => $"{PriorityPrefixResource} 3" },
-                new ControlFormItemInputComboItem() { Value = _ => "P4", Text = _ => $"{PriorityPrefixResource} 4" }
+                new ControlFormItemInputComboItem() { Value = _ => "P1", Text = _ => Priority(1) },
+                new ControlFormItemInputComboItem() { Value = _ => "P2", Text = _ => Priority(2) },
+                new ControlFormItemInputComboItem() { Value = _ => "P3", Text = _ => Priority(3) },
+                new ControlFormItemInputComboItem() { Value = _ => "P4", Text = _ => Priority(4) }
             );
             form.Add(urgency);
 

@@ -322,15 +322,17 @@ namespace KleeneStar.Portal.WebManager
             var me = FallbackIdentityId;
             var now = DateTime.UtcNow;
 
-            // NOTE: the core Comment entity does not model a visibility flag yet; the
-            // supplied visibility is accepted for API compatibility but every persisted
-            // comment is public (see the roadmap document for the open item).
+            // an unknown token widens rather than narrows: CommentVisibilityExtensions.Parse
+            // reads anything it does not recognise as Public, so a client that misspells the
+            // flag never gets a comment that is quietly hidden from the requester. The REST
+            // endpoint rejects a malformed token before it reaches here.
             var comment = new Comment
             {
                 ObjectId = entity.Id,
                 AuthorId = me,
                 Content = text,
                 State = CommentState.Active,
+                Visibility = CommentVisibilityExtensions.Parse(visibility),
                 Created = now,
                 Updated = now
             };
@@ -1024,10 +1026,14 @@ namespace KleeneStar.Portal.WebManager
                 .Where(p => p is not null)
                 .ToList();
 
+            // the portal timeline is visibility-filtered (concept §Portal Manager); the
+            // operator-side thread is not, so the filter belongs here rather than in the
+            // comment manager
             var timeline = comments is null
                 ? []
                 : comments
                     .Where(c => c.State != CommentState.Deleted)
+                    .Where(c => IsVisibleToViewer(c, entity, FallbackIdentityId))
                     .OrderBy(c => c.Created)
                     .Select(c => ToIssueComment(c, requester))
                     .ToList();
@@ -1307,6 +1313,10 @@ namespace KleeneStar.Portal.WebManager
                 AuthorId = FallbackIdentityId,
                 Content = text,
                 State = CommentState.Active,
+
+                // machine narration describes the lifecycle everyone with access already
+                // sees, so it is never an internal note
+                Visibility = CommentVisibility.Public,
                 Created = timestamp,
                 Updated = timestamp
             });
@@ -1380,10 +1390,41 @@ namespace KleeneStar.Portal.WebManager
                 Author = author,
                 IsSystem = false,
                 Role = isRequester ? "Requester" : "Service Team",
-                Visibility = "public",
+                Visibility = comment.Visibility.Token(),
                 Timestamp = comment.Created,
                 Text = comment.Content
             };
+        }
+
+        /// <summary>
+        /// Determines whether a comment reaches a portal viewer.
+        /// </summary>
+        /// <remarks>
+        /// A <see cref="CommentVisibility.Public"/> comment reaches everyone who can open
+        /// the issue. A <see cref="CommentVisibility.InternalTeam"/> comment reaches the
+        /// assigned service group plus the requester (concept §Issue Detail): the object's
+        /// creator, its assignee, and the comment's own author. Identities the issue was
+        /// merely shared with, and watchers, do not see it.
+        /// <para>
+        /// The viewer is <see cref="FallbackIdentityId"/> until the WebExpress identity flow
+        /// exposes the authenticated identity on the request — the same stand-in every other
+        /// portal action uses.
+        /// </para>
+        /// </remarks>
+        /// <param name="comment">The comment to test.</param>
+        /// <param name="entity">The object the comment hangs on.</param>
+        /// <param name="viewerId">The identity reading the timeline.</param>
+        /// <returns><see langword="true"/> when the comment reaches the viewer.</returns>
+        private static bool IsVisibleToViewer(Comment comment, ObjectEntity entity, Guid viewerId)
+        {
+            if (comment.Visibility != CommentVisibility.InternalTeam)
+            {
+                return true;
+            }
+
+            return entity.CreatorId == viewerId
+                || entity.AssigneeId == viewerId
+                || comment.AuthorId == viewerId;
         }
 
         /// <summary>

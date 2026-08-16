@@ -1,13 +1,16 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using WebExpress.WebUI.WebControl;
 
 namespace KleeneStar.Portal.WebDomain
 {
     /// <summary>
-    /// Pure formatting helpers shared by all portal pages and fragments. Translates the
-    /// portal lifecycle states to German display labels, builds the standard issue table,
-    /// and renders timestamps as coarse relative phrases.
+    /// Pure formatting helpers shared by all portal pages and fragments. Resolves the
+    /// portal lifecycle states to their localized display labels, builds the standard
+    /// issue table, and renders timestamps as coarse relative phrases. Every helper takes
+    /// the translation function rather than reaching for the resource manager itself, so
+    /// a caller outside a render context can supply its own.
     /// </summary>
     public static class PortalFormatter
     {
@@ -28,18 +31,30 @@ namespace KleeneStar.Portal.WebDomain
         };
 
         /// <summary>
-        /// Renders a timestamp as a coarse relative phrase ("vor 2 Std.", "vor 4 Tagen").
+        /// Renders a timestamp as a coarse relative phrase ("2 hrs. ago", "vor 4 Tagen").
         /// </summary>
+        /// <remarks>
+        /// Each bucket is one whole pattern rather than a shared "ago" token plus a unit,
+        /// because the two languages put the marker on opposite sides of the number —
+        /// composing them here produced "ago 2 hrs." in English.
+        /// </remarks>
         /// <param name="timestamp">The timestamp to format.</param>
         /// <param name="translate">The translation function.</param>
         /// <returns>A short relative string.</returns>
         public static string FormatRelative(DateTime timestamp, Func<string, string> translate)
         {
+            string Bucket(string key, int value)
+            {
+                return string.Format(CultureInfo.CurrentCulture, translate(key) ?? string.Empty, value);
+            }
+
             var delta = DateTime.UtcNow - timestamp;
-            if (delta.TotalMinutes < 60) { return $"{translate("kleenestar.portal:relative.ago.prefix")} {Math.Max(1, (int)delta.TotalMinutes)} {translate("kleenestar.portal:relative.minutes")}"; }
-            if (delta.TotalHours < 24) { return $"{translate("kleenestar.portal:relative.ago.prefix")} {(int)delta.TotalHours} {translate("kleenestar.portal:relative.hours")}"; }
-            if (delta.TotalDays < 7) { return $"{translate("kleenestar.portal:relative.ago.prefix")} {(int)delta.TotalDays} {translate("kleenestar.portal:relative.days")}"; }
-            return $"{translate("kleenestar.portal:relative.ago.prefix")} {(int)(delta.TotalDays / 7)} {translate("kleenestar.portal:relative.weeks")}";
+
+            if (delta.TotalMinutes < 60) { return Bucket("kleenestar.portal:relative.minutes", Math.Max(1, (int)delta.TotalMinutes)); }
+            if (delta.TotalHours < 24) { return Bucket("kleenestar.portal:relative.hours", (int)delta.TotalHours); }
+            if (delta.TotalDays < 7) { return Bucket("kleenestar.portal:relative.days", (int)delta.TotalDays); }
+
+            return Bucket("kleenestar.portal:relative.weeks", (int)(delta.TotalDays / 7));
         }
 
         /// <summary>

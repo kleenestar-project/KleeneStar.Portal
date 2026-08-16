@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebControl;
 using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebData;
 using WebExpress.WebCore.WebAttribute;
@@ -24,9 +25,20 @@ namespace KleeneStar.Portal.WebFragment
     public sealed class PortalMineViewTableFragment : FragmentControlViewItem
     {
         /// <summary>
+        /// The id of the table. It is fixed rather than generated, because the empty-state
+        /// placeholder names the table it belongs to.
+        /// </summary>
+        public const string TableId = "portal-mine-issues-table";
+
+        /// <summary>
+        /// Resource key of the message shown while the view has no matching issues.
+        /// </summary>
+        public const string EmptyResource = "kleenestar.portal:mine.empty";
+
+        /// <summary>
         /// Gets the table that displays the calling identity's issues.
         /// </summary>
-        public ControlDataTable Table { get; } = new ControlDataTable()
+        public ControlDataTable Table { get; } = new ControlDataTable(TableId)
         {
             ServiceFactory = _ => DataServiceDescriptor.TableData(PortalHub.GetUri<global::KleeneStar.Portal.WWW.Api._1_.Issues.Mine.Table>().ToString())
         };
@@ -46,6 +58,10 @@ namespace KleeneStar.Portal.WebFragment
                 .Add(new BindPaging() { Source = PortalMineViewPaginationFragment.ContentId });
 
             Add(Table);
+
+            // ControlDataTable paints an empty result as a bare header, so the "nothing here"
+            // message is contributed as a sibling and toggled by the companion script
+            Add(TableEmptyState.Create(TableId, EmptyResource));
         }
 
         /// <summary>
@@ -62,6 +78,13 @@ namespace KleeneStar.Portal.WebFragment
         /// </returns>
         public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
+            var script = TableEmptyState.Script;
+
+            if (!string.IsNullOrEmpty(script))
+            {
+                visualTree.AddHeaderScript(script);
+            }
+
             return base.Render(renderContext, visualTree);
         }
     }

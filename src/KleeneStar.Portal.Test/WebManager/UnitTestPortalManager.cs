@@ -550,6 +550,114 @@ namespace KleeneStar.Portal.Test.WebManager
         }
 
         /// <summary>
+        /// AddComment persists the requested audience on the comment row and echoes it
+        /// back on the projected timeline entry, rather than storing every comment as
+        /// public.
+        /// </summary>
+        [Fact]
+        public void AddComment_PersistsVisibility()
+        {
+            var connectionString = nameof(AddComment_PersistsVisibility);
+            var manager = Seed(connectionString);
+
+            manager.AddComment("SD-1", "Checked the mailbox quota.", "internal-team");
+
+            using var db = PortalHubFixture.CreateDbContext(connectionString);
+            var stored = db.Comments.Single(c => c.ObjectId == MineObjectId);
+            Assert.Equal(CommentVisibility.InternalTeam, stored.Visibility);
+
+            var issue = manager.GetIssue("SD-1");
+            var entry = Assert.Single(issue!.Comments);
+            Assert.Equal("internal-team", entry.Visibility);
+        }
+
+        /// <summary>
+        /// An unrecognised visibility token widens to public instead of narrowing, so a
+        /// misspelled flag never hides a comment the requester was meant to read.
+        /// </summary>
+        [Fact]
+        public void AddComment_UnknownVisibilityReadsAsPublic()
+        {
+            var connectionString = nameof(AddComment_UnknownVisibilityReadsAsPublic);
+            var manager = Seed(connectionString);
+
+            manager.AddComment("SD-1", "Any update?", "internal_team");
+
+            using var db = PortalHubFixture.CreateDbContext(connectionString);
+            Assert.Equal(CommentVisibility.Public, db.Comments.Single(c => c.ObjectId == MineObjectId).Visibility);
+        }
+
+        /// <summary>
+        /// The projected timeline drops an internal-team comment for a viewer who is
+        /// neither the requester, the assignee, nor its author — the audience the portal
+        /// concept limits such a comment to — while public comments stay.
+        /// </summary>
+        [Fact]
+        public void GetIssue_FiltersInternalCommentsForUninvolvedViewer()
+        {
+            var connectionString = nameof(GetIssue_FiltersInternalCommentsForUninvolvedViewer);
+            var manager = Seed(connectionString);
+
+            // SD-2 was raised by the second tenant member and carries no assignee, so the
+            // acting portal identity is none of the three audiences of an internal note.
+            AddComment(connectionString, ForeignObjectId, MemberIdentityId, "Visible to everyone.", CommentVisibility.Public);
+            AddComment(connectionString, ForeignObjectId, MemberIdentityId, "Service team only.", CommentVisibility.InternalTeam);
+
+            var issue = manager.GetIssue("SD-2");
+
+            var entry = Assert.Single(issue!.Comments);
+            Assert.Equal("Visible to everyone.", entry.Text);
+        }
+
+        /// <summary>
+        /// The requester of an issue does see its internal-team comments: the concept
+        /// limits them to the assigned service group <em>plus the requester</em>.
+        /// </summary>
+        [Fact]
+        public void GetIssue_KeepsInternalCommentsForRequester()
+        {
+            var connectionString = nameof(GetIssue_KeepsInternalCommentsForRequester);
+            var manager = Seed(connectionString);
+
+            // SD-1 was raised by the acting portal identity, so it is that viewer's own
+            // issue and the internal note reaches them.
+            AddComment(connectionString, MineObjectId, MemberIdentityId, "Service team only.", CommentVisibility.InternalTeam);
+
+            var issue = manager.GetIssue("SD-1");
+
+            var entry = Assert.Single(issue!.Comments);
+            Assert.Equal("Service team only.", entry.Text);
+        }
+
+        /// <summary>
+        /// Writes a comment straight to the store so a test can author it as an identity
+        /// other than the portal's acting one, which <see cref="IPortalManager.AddComment"/>
+        /// always uses.
+        /// </summary>
+        /// <param name="connectionString">The per-test in-memory database name.</param>
+        /// <param name="objectId">The object to comment on.</param>
+        /// <param name="authorId">The authoring identity.</param>
+        /// <param name="text">The message body.</param>
+        /// <param name="visibility">The audience of the comment.</param>
+        private static void AddComment(string connectionString, Guid objectId, Guid authorId, string text, CommentVisibility visibility)
+        {
+            using var db = PortalHubFixture.CreateDbContext(connectionString);
+
+            db.Comments.Add(new Comment
+            {
+                ObjectId = objectId,
+                AuthorId = authorId,
+                Content = text,
+                State = CommentState.Active,
+                Visibility = visibility,
+                Created = DateTime.UtcNow,
+                Updated = DateTime.UtcNow
+            });
+
+            db.SaveChanges();
+        }
+
+        /// <summary>
         /// ShareIssue persists one share per identity, tolerates duplicates silently,
         /// and raises <see cref="IPortalManager.IssueShared"/> only when something
         /// actually changed.

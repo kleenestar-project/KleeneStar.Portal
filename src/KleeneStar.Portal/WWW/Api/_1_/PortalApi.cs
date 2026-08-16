@@ -86,18 +86,15 @@ namespace KleeneStar.Portal.WWW.Api._1_
 
         /// <summary>
         /// Wraps a state conflict (e.g. accepting a resolution that has not been
-        /// proposed) into a JSON <c>422</c> response. The concept document specifies
-        /// <c>409 Conflict</c>; WebExpress 2.0.0-alpha does not ship a dedicated
-        /// conflict response type, so the portal falls back to
-        /// <c>422 Unprocessable Entity</c> and surfaces the conflict reason in the
-        /// <c>error</c> field. When <c>ResponseConflict</c> becomes available in a
-        /// later WebExpress release, this method should switch to it.
+        /// proposed) into a JSON <c>409 Conflict</c> response, the status the concept
+        /// document specifies, and surfaces the conflict reason in the <c>error</c>
+        /// field.
         /// </summary>
         /// <param name="message">The conflict message.</param>
         /// <returns>The response.</returns>
         internal static IResponse Conflict(string message)
         {
-            return new ResponseUnprocessableEntity
+            return new ResponseConflict
             {
                 Content = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { error = message }, JsonOptions))
             }
@@ -106,7 +103,7 @@ namespace KleeneStar.Portal.WWW.Api._1_
 
         /// <summary>
         /// Runs <paramref name="action"/> and maps a <see cref="KleeneStar.Portal.WebManager.PortalConflictException"/>
-        /// to a <c>409/422</c> response (see <see cref="Conflict"/>). Any other
+        /// to a <c>409 Conflict</c> response (see <see cref="Conflict"/>). Any other
         /// exception is allowed to propagate so framework-level error handling
         /// continues to work.
         /// </summary>

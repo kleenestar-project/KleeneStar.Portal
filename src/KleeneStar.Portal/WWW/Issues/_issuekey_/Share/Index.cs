@@ -7,6 +7,7 @@ using KleeneStar.Portal.WebScope;
 using System;
 using System.Linq;
 using WebExpress.WebApp.WebPage;
+using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebPage;
 using WebExpress.WebUI.WebControl;
@@ -120,9 +121,13 @@ namespace KleeneStar.Portal.WWW.Issues._issuekey_.Share
             // the already-shared list
             if (issue.SharedWith.Count > 0)
             {
+                // the count is formatted into the resource rather than appended to its
+                // key, which would leave the key itself on the page
+                var alreadyShared = I18N.Translate(renderContext, AlreadySharedResource, issue.SharedWith.Count);
+
                 visualTree.Content.MainPanel.AddPrimary(new ControlText()
                 {
-                    Text = _ => $"{AlreadySharedResource} ({issue.SharedWith.Count})",
+                    Text = _ => alreadyShared,
                     TextColor = _ => new PropertyColorText(TypeColorText.Secondary),
                     Margin = _ => new PropertySpacingMargin(PropertySpacing.Space.Three, PropertySpacing.Space.None, PropertySpacing.Space.One, PropertySpacing.Space.None)
                 });

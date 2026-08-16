@@ -16,6 +16,7 @@ org.title=Organisation
 nav.home.label=Start
 nav.mine.label=Meine Vorgänge
 nav.org.label=Organisation
+nav.admin.label=Verwaltung
 
 # Issue lifecycle states (German)
 state.open=Offen
@@ -58,6 +59,21 @@ org.empty=Keine Vorgänge sichtbar.
 # Request type tiles
 request-type.templates.count={0} Vorlagen
 
+# Request type / template picker
+types.picker.hint=Wähle eine Vorlage, die zu deinem Anliegen passt.
+types.picker.blank=Leere Anfrage
+types.picker.blank.hint=Ohne Vorlage starten und alles selbst ausfüllen.
+types.picker.unavailable=Dieser Anfrage-Typ ist nicht verfügbar oder nicht für dich freigegeben.
+
+# Create issue form
+create.title.label=Titel
+create.description.label=Beschreibung
+create.urgency.label=Dringlichkeit
+create.priority=Priorität {0}
+create.submit=Anfrage senden
+create.cancel=Abbrechen
+create.unavailable=Dieser Anfrage-Typ ist nicht verfügbar oder nicht für dich freigegeben.
+
 # Issue detail page
 issue.not-found=Vorgang '{0}' wurde nicht gefunden oder ist nicht für dich freigegeben.
 issue.header.summary={0} · {1} · {2} · {3} · von {4} · zugewiesen an {5}
@@ -67,21 +83,49 @@ issue.history.entry.singular=Eintrag
 issue.history.entry.plural=Einträge
 issue.history.heading=VERLAUF · {0} {1}
 issue.system=System
+issue.comment.internal=Nur Service-Team
 issue.details.heading=DETAILS
 issue.note.label=Hinweis
 issue.shared-with.heading=GETEILT MIT ({0})
 issue.watchers.heading=BEOBACHTER ({0})
 
+# Accept resolution
+accept.headline=Lösung bestätigen
+accept.description=Bestätige, dass dein Anliegen behoben ist. Der Vorgang wird damit geschlossen.
+accept.not-found=Vorgang wurde nicht gefunden oder ist nicht für dich freigegeben.
+accept.conflict=Für diesen Vorgang wurde noch keine Lösung vorgeschlagen.
+accept.already-closed=Dieser Vorgang ist bereits geschlossen. Es ist nichts weiter zu tun.
+accept.submit=Lösung bestätigen
+accept.cancel=Abbrechen
+
+# Reject resolution
+reject.headline=Lösung ablehnen
+reject.description=Sag uns kurz, was noch offen ist. Der Vorgang wird wieder in Bearbeitung genommen.
+reject.reason.label=Begründung
+reject.not-found=Vorgang wurde nicht gefunden oder ist nicht für dich freigegeben.
+reject.conflict=Für diesen Vorgang wurde noch keine Lösung vorgeschlagen.
+reject.submit=Lösung ablehnen
+reject.cancel=Abbrechen
+
+# Share issue
+share.headline=Vorgang teilen
+share.invite.label=Personen einladen
+share.already=BEREITS GETEILT MIT ({0})
+share.link=Link zum Vorgang
+share.not-found=Vorgang wurde nicht gefunden oder ist nicht für dich freigegeben.
+share.submit=Teilen
+share.cancel=Abbrechen
+
 # Common values
 common.na=—
 common.separator.value= · {0}
 
-# Relative time
-relative.ago.prefix=vor
-relative.minutes=Min.
-relative.hours=Std.
-relative.days=Tagen
-relative.weeks=Wochen
+# Relative time — one whole phrase per bucket, because the "ago" marker sits on the
+# opposite side of the number in English
+relative.minutes=vor {0} Min.
+relative.hours=vor {0} Std.
+relative.days=vor {0} Tagen
+relative.weeks=vor {0} Wochen
 
 # Table headers
 table.key=Schlüssel
@@ -106,3 +150,91 @@ profile.header=Mein Profil
 profile.description=Deine Anzeigedaten im Service-Portal. Nur die hier sichtbaren Felder werden im Portal verwendet.
 profile.field.displayname.label=Anzeigename
 profile.field.email.label=E-Mail-Adresse
+
+# Administration — workspace list
+admin.workspaces.title=Arbeitsbereiche
+admin.workspaces.headline=Arbeitsbereiche
+admin.workspaces.empty=Keine Arbeitsbereiche vorhanden.
+admin.workspaces.column.key=Schlüssel
+admin.workspaces.column.name=Name
+admin.workspaces.column.classes=Klassen
+admin.workspaces.column.description=Beschreibung
+
+# Administration — single workspace
+admin.workspace.headline=Arbeitsbereich
+admin.workspace.not-found=Arbeitsbereich wurde nicht gefunden oder ist nicht für dich freigegeben.
+admin.workspace.description=Beschreibung
+admin.workspace.classes=KLASSEN
+admin.workspace.empty=In diesem Arbeitsbereich sind keine Klassen modelliert.
+admin.workspace.open=Öffnen
+
+# Administration — class list
+admin.classes.headline=Klassen
+admin.classes.empty=Keine Klassen vorhanden.
+admin.classes.column.name=Name
+admin.classes.column.description=Beschreibung
+admin.classes.column.visibility=Portal-sichtbar
+
+# Administration — single class
+admin.class.headline=Klasse
+admin.class.not-found=Klasse wurde nicht gefunden oder ist nicht für dich freigegeben.
+admin.class.description=Beschreibung
+admin.class.state=Status
+admin.class.workspace=BEREICHE
+admin.class.portal-visible.on=Im Portal sichtbar machen
+admin.class.portal-visible.off=Aus dem Portal ausblenden
+admin.class.badge.portal-visible=Portal-sichtbar
+admin.class.badge.internal=Intern
+admin.class.tab.fields=Felder
+admin.class.tab.statuses=Status
+admin.class.tab.priorities=Prioritäten
+admin.class.tab.forms=Formulare
+
+# Administration — fields
+admin.fields.headline=Felder
+admin.fields.empty=Für diese Klasse sind keine Felder definiert.
+admin.fields.column.name=Name
+admin.fields.column.type=Typ
+admin.fields.column.cardinality=Kardinalität
+admin.fields.column.required=Pflicht
+admin.fields.column.unique=Eindeutig
+admin.fields.column.description=Beschreibung
+admin.fields.column.actions=Aktionen
+admin.fields.action.add=Feld hinzufügen
+admin.fields.action.save=Speichern
+admin.fields.action.clone=Duplizieren
+admin.fields.action.delete-confirm="{0}" wirklich löschen?
+
+# Administration — forms
+admin.forms.headline=Formulare
+admin.forms.empty=Für diese Klasse sind keine Formulare definiert.
+admin.forms.column.name=Name
+admin.forms.column.description=Beschreibung
+admin.forms.column.portal-template=Portal-Vorlage
+admin.forms.action.set-template=Als Portal-Vorlage festlegen
+admin.forms.action.unset-template=Als Portal-Vorlage entfernen
+
+# Administration — priorities
+admin.priorities.headline=Prioritäten
+admin.priorities.empty=Für diese Klasse sind keine Prioritäten definiert.
+admin.priorities.column.name=Name
+
+# Administration — statuses
+admin.statuses.headline=Status
+admin.statuses.empty=Für diese Klasse sind keine Status definiert.
+admin.statuses.column.name=Name
+admin.statuses.column.description=Beschreibung
+
+# Administration — REST API endpoint titles
+api.admin.workspaces.title=Arbeitsbereiche (Verwaltung)
+api.admin.classes.title=Klassen (Verwaltung)
+api.admin.class.portalvisible.title=Portal-Sichtbarkeit der Klasse
+api.admin.fields.title=Felder (Verwaltung)
+api.admin.field.create.title=Feld anlegen
+api.admin.field.update.title=Feld ändern
+api.admin.field.delete.title=Feld löschen
+api.admin.field.clone.title=Feld duplizieren
+api.admin.forms.title=Formulare (Verwaltung)
+api.admin.form.portaltemplate.title=Portal-Vorlage des Formulars
+api.admin.priorities.title=Prioritäten (Verwaltung)
+api.admin.statuses.title=Status (Verwaltung)

@@ -5,6 +5,7 @@ using KleeneStar.Portal.WebManager;
 using KleeneStar.Portal.WebScope;
 using System.Linq;
 using WebExpress.WebApp.WebPage;
+using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebPage;
 using WebExpress.WebUI.WebControl;
@@ -58,9 +59,11 @@ namespace KleeneStar.Portal.WWW.Workspaces._workspacekey_.Classes
             var keyParameter = renderContext.Request.GetParameter<WorkspaceKeyParameter>();
             var workspace = _portalManager.GetWorkspace(keyParameter?.Value);
 
+            // the heading is resolved before the workspace name is prefixed; interpolating
+            // the raw key would leave it untranslated in the browser tab
             visualTree.Title = workspace is null
                 ? HeadlineResource
-                : $"{workspace.Name} — {HeadlineResource}";
+                : $"{workspace.Name} — {I18N.Translate(renderContext, HeadlineResource)}";
             visualTree.Content.MainPanel.Headline.Title = HeadlineResource;
 
             if (workspace is null)

@@ -273,8 +273,14 @@ namespace KleeneStar.Portal.WebManager
         /// </summary>
         /// <param name="issueKey">The issue to comment on.</param>
         /// <param name="text">The message body.</param>
-        /// <param name="visibility">The visibility flag (<c>public</c> or <c>internal-team</c>).</param>
-        /// <returns>The updated issue.</returns>
+        /// <param name="visibility">
+        /// The visibility flag (<c>public</c> or <c>internal-team</c>). It is persisted on
+        /// the comment and narrows the timeline the portal projects: an
+        /// <c>internal-team</c> comment reaches the assigned service group plus the
+        /// requester, never the identities the issue is merely shared with. An
+        /// unrecognised value reads as <c>public</c>.
+        /// </param>
+        /// <returns>The updated issue, whose timeline is filtered for the caller.</returns>
         IIssue AddComment(string issueKey, string text, string visibility);
 
         /// <summary>

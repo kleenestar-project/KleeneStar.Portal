@@ -8,10 +8,8 @@ namespace KleeneStar.Portal.WebManager
     /// not been proposed, or unsubscribing from an issue the caller never watched.
     /// </summary>
     /// <remarks>
-    /// The portal REST layer maps this to a <c>409 Conflict</c> response; the
-    /// <c>KleeneStar.WebExpress</c> stack used at runtime does not yet ship a
-    /// dedicated conflict response type, so the REST plumbing falls back to
-    /// <c>422 Unprocessable Entity</c> (see <c>PortalApi.Conflict</c>).
+    /// The portal REST layer maps this to a <c>409 Conflict</c> response through
+    /// <c>PortalApi.Conflict</c>.
     /// </remarks>
     public sealed class PortalConflictException : Exception
     {
