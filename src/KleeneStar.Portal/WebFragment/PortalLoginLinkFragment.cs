@@ -6,6 +6,7 @@ using WebExpress.WebCore.WebComponent;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
 using WebExpress.WebCore.WebScope;
+using WebExpress.WebCore.WebIcon;
 using WebExpress.WebUI.WebControl;
 using WebExpress.WebUI.WebFragment;
 using WebExpress.WebUI.WebIcon;
@@ -36,7 +37,7 @@ namespace KleeneStar.Portal.WebFragment
         {
             _componentHub = componentHub;
             Text = _ => "webexpress.webapp:login.label";
-            Icon = _ => new IconRightToBracket();
+            Icon = _ => new IconRightToBracket(TypeIconTheme.Light);
             PrimaryAction = renderContext => new ActionModal
             (
                 "modal-login",

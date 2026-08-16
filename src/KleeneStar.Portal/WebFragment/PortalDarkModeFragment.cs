@@ -6,6 +6,7 @@ using WebExpress.WebCore.WebComponent;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
 using WebExpress.WebCore.WebScope;
+using WebExpress.WebCore.WebIcon;
 using WebExpress.WebUI.WebControl;
 using WebExpress.WebUI.WebFragment;
 using WebExpress.WebUI.WebIcon;
@@ -31,7 +32,7 @@ namespace KleeneStar.Portal.WebFragment
         public PortalDarkModeFragment(IComponentHub componentHub, IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
-            Icon = _ => new IconMoon();
+            Icon = _ => new IconMoon(TypeIconTheme.Light);
             PrimaryAction = _ => new ActionDarkmode();
             Text = _ => "webexpress.webui:darkmode.label";
             Bind = ctx => new Binding().Add(new BindDarkmode

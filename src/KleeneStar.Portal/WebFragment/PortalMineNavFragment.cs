@@ -3,6 +3,7 @@ using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
+using WebExpress.WebCore.WebIcon;
 using WebExpress.WebUI.WebFragment;
 using WebExpress.WebUI.WebIcon;
 using WebExpress.WebUI.WebPage;
@@ -25,7 +26,7 @@ namespace KleeneStar.Portal.WebFragment
             : base(fragmentContext)
         {
             Text = _ => "kleenestar.portal:nav.mine.label";
-            Icon = _ => new IconUser();
+            Icon = _ => new IconUser(TypeIconTheme.Light);
             Uri = _ => PortalHub.GetUri<WWW.Mine.Index>();
         }
 

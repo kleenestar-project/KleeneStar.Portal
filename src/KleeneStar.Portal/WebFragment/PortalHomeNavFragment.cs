@@ -3,6 +3,7 @@ using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
+using WebExpress.WebCore.WebIcon;
 using WebExpress.WebUI.WebFragment;
 using WebExpress.WebUI.WebIcon;
 using WebExpress.WebUI.WebPage;
@@ -26,7 +27,7 @@ namespace KleeneStar.Portal.WebFragment
             : base(fragmentContext)
         {
             Text = _ => "kleenestar.portal:nav.home.label";
-            Icon = _ => new IconHouse();
+            Icon = _ => new IconHouse(TypeIconTheme.Light);
         }
 
         /// <summary>
