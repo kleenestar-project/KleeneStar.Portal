@@ -1,10 +1,10 @@
 # en-US language resource file
-plugin.name=KleeneStar.Portal
 plugin.description=Customer portal plugin for the KleeneStar platform.
+plugin.name=KleeneStar.Portal
 
-app.name=KleeneStar Service Portal
-app.label=KleeneStar Service Portal
 app.description=The KleeneStar customer portal — the simple way to report, track, and resolve requests.
+app.label=KleeneStar Service Portal
+app.name=KleeneStar Service Portal
 
 # Page titles
 home.title=Service Portal
@@ -13,228 +13,228 @@ mine.title=My Issues
 org.title=Organization
 
 # Top navigation labels
+nav.admin.label=Administration
 nav.home.label=Home
 nav.mine.label=My Issues
 nav.org.label=Organization
-nav.admin.label=Administration
 
 # Issue lifecycle states
-state.open=Open
-state.in-progress=In Progress
-state.waiting=Waiting on Requester
-state.resolved=Resolved
 state.closed=Closed
+state.in-progress=In Progress
+state.open=Open
+state.resolved=Resolved
+state.waiting=Waiting on Requester
 
 # Common UI labels
-issue.description.label=Description
-issue.history.label=History
-issue.details.label=Details
-issue.shared-with.label=Shared with
-issue.watchers.label=Watchers
-issue.requester.label=Requester
+issue.approval-required.label=Approval required
 issue.assignee.label=Assigned to
 issue.created.label=Created
-issue.updated.label=Updated
+issue.description.label=Description
+issue.details.label=Details
+issue.history.label=History
 issue.priority.label=Priority
+issue.requester.label=Requester
+issue.shared-with.label=Shared with
 issue.type.label=Type
-issue.approval-required.label=Approval required
+issue.updated.label=Updated
+issue.watchers.label=Watchers
 
 # Home page
 home.headline=How can we help?
 home.headline.with-name=How can we help, {0}?
-home.request-types.heading=REQUEST TYPES
-home.recent.heading=RECENTLY BY YOU
 home.recent.empty=No requests yet.
+home.recent.heading=RECENTLY BY YOU
+home.request-types.heading=REQUEST TYPES
 
 # Mine page
-mine.headline=My Issues
 mine.description=Requests you created or where you are involved.
 mine.empty=No matching issues — try different filters or start a new request.
+mine.headline=My Issues
 
 # Organization page
-org.headline=Issues in the organization
 org.description=All requests you have access to.
 org.empty=No issues visible.
+org.headline=Issues in the organization
 
 # Request type tiles
 request-type.templates.count={0} templates
 
 # Request type / template picker
-types.picker.hint=Pick the template that fits your request.
 types.picker.blank=Blank request
 types.picker.blank.hint=Start without a template and fill in everything yourself.
+types.picker.hint=Pick the template that fits your request.
 types.picker.unavailable=This request type is unavailable or not shared with you.
 
 # Create issue form
-create.title.label=Title
+create.cancel=Cancel
 create.description.label=Description
-create.urgency.label=Urgency
 create.priority=Priority {0}
 create.submit=Submit request
-create.cancel=Cancel
+create.title.label=Title
 create.unavailable=This request type is unavailable or not shared with you.
+create.urgency.label=Urgency
 
 # Issue detail page
-issue.not-found=Issue '{0}' was not found or is not shared with you.
-issue.header.summary={0} · {1} · {2} · {3} · by {4} · assigned to {5}
-issue.resolution.banner=Resolution proposed. Please review and confirm that your request is resolved.
-issue.description.heading=DESCRIPTION
-issue.history.entry.singular=entry
-issue.history.entry.plural=entries
-issue.history.heading=HISTORY · {0} {1}
-issue.system=System
 issue.comment.internal=Service team only
+issue.description.heading=DESCRIPTION
 issue.details.heading=DETAILS
+issue.header.summary={0} · {1} · {2} · {3} · by {4} · assigned to {5}
+issue.history.entry.plural=entries
+issue.history.entry.singular=entry
+issue.history.heading=HISTORY · {0} {1}
 issue.note.label=Note
+issue.not-found=Issue '{0}' was not found or is not shared with you.
+issue.resolution.banner=Resolution proposed. Please review and confirm that your request is resolved.
 issue.shared-with.heading=SHARED WITH ({0})
+issue.system=System
 issue.watchers.heading=WATCHERS ({0})
 
 # Accept resolution
-accept.headline=Confirm resolution
-accept.description=Confirm that your request is resolved. The issue is closed with it.
-accept.not-found=The issue was not found or is not shared with you.
-accept.conflict=No resolution has been proposed for this issue yet.
 accept.already-closed=This issue is already closed. Nothing further to do.
-accept.submit=Confirm resolution
 accept.cancel=Cancel
+accept.conflict=No resolution has been proposed for this issue yet.
+accept.description=Confirm that your request is resolved. The issue is closed with it.
+accept.headline=Confirm resolution
+accept.not-found=The issue was not found or is not shared with you.
+accept.submit=Confirm resolution
 
 # Reject resolution
-reject.headline=Reject resolution
-reject.description=Tell us briefly what is still open. The issue is reopened for the service team.
-reject.reason.label=Reason
-reject.not-found=The issue was not found or is not shared with you.
-reject.conflict=No resolution has been proposed for this issue yet.
-reject.submit=Reject resolution
 reject.cancel=Cancel
+reject.conflict=No resolution has been proposed for this issue yet.
+reject.description=Tell us briefly what is still open. The issue is reopened for the service team.
+reject.headline=Reject resolution
+reject.not-found=The issue was not found or is not shared with you.
+reject.reason.label=Reason
+reject.submit=Reject resolution
 
 # Share issue
+share.already=ALREADY SHARED WITH ({0})
+share.cancel=Cancel
 share.headline=Share issue
 share.invite.label=Invite people
-share.already=ALREADY SHARED WITH ({0})
 share.link=Link to the issue
 share.not-found=The issue was not found or is not shared with you.
 share.submit=Share
-share.cancel=Cancel
 
 # Common values
 common.na=—
 common.separator.value= · {0}
 
-# Relative time — one whole phrase per bucket, because the "ago" marker sits on the
 # opposite side of the number in German
-relative.minutes={0} min. ago
-relative.hours={0} hrs. ago
+# Relative time — one whole phrase per bucket, because the "ago" marker sits on the
 relative.days={0} days ago
+relative.hours={0} hrs. ago
+relative.minutes={0} min. ago
 relative.weeks={0} weeks ago
 
 # Table headers
 table.key=Key
-table.title=Title
-table.status=Status
 table.priority=Priority
+table.status=Status
+table.title=Title
 table.updated=Updated
 
 # REST API endpoint titles
-api.requesttypes.title=Request type catalog
-api.issues.title=Issues
-api.issue.title=Issue
-api.issue.comments.title=Issue comments
-api.issue.share.title=Issue sharing
-api.issue.watch.title=Issue watch subscription
 api.issue.accept.title=Accept resolution
+api.issue.comments.title=Issue comments
 api.issue.reject.title=Reject resolution
+api.issue.share.title=Issue sharing
+api.issue.title=Issue
+api.issue.watch.title=Issue watch subscription
+api.issues.title=Issues
+api.requesttypes.title=Request type catalog
 
 # Profile page (reduced customer-portal variant)
-profile.title=My Profile
-profile.header=My Profile
 profile.description=Your display data in the service portal. Only the fields shown here are used in the portal.
 profile.field.displayname.label=Display name
 profile.field.email.label=Email address
+profile.header=My Profile
+profile.title=My Profile
 
 # Administration — workspace list
-admin.workspaces.title=Workspaces
-admin.workspaces.headline=Workspaces
-admin.workspaces.empty=No workspaces available.
-admin.workspaces.column.key=Key
-admin.workspaces.column.name=Name
 admin.workspaces.column.classes=Classes
 admin.workspaces.column.description=Description
+admin.workspaces.column.key=Key
+admin.workspaces.column.name=Name
+admin.workspaces.empty=No workspaces available.
+admin.workspaces.headline=Workspaces
+admin.workspaces.title=Workspaces
 
 # Administration — single workspace
+admin.workspace.classes=CLASSES
+admin.workspace.description=Description
+admin.workspace.empty=No classes are modelled in this workspace.
 admin.workspace.headline=Workspace
 admin.workspace.not-found=The workspace was not found or is not shared with you.
-admin.workspace.description=Description
-admin.workspace.classes=CLASSES
-admin.workspace.empty=No classes are modelled in this workspace.
 admin.workspace.open=Open
 
 # Administration — class list
-admin.classes.headline=Classes
-admin.classes.empty=No classes available.
-admin.classes.column.name=Name
 admin.classes.column.description=Description
+admin.classes.column.name=Name
 admin.classes.column.visibility=Portal-visible
+admin.classes.empty=No classes available.
+admin.classes.headline=Classes
 
 # Administration — single class
+admin.class.badge.internal=Internal
+admin.class.badge.portal-visible=Portal-visible
+admin.class.description=Description
 admin.class.headline=Class
 admin.class.not-found=The class was not found or is not shared with you.
-admin.class.description=Description
-admin.class.state=State
-admin.class.workspace=SECTIONS
-admin.class.portal-visible.on=Make visible in the portal
 admin.class.portal-visible.off=Hide from the portal
-admin.class.badge.portal-visible=Portal-visible
-admin.class.badge.internal=Internal
+admin.class.portal-visible.on=Make visible in the portal
+admin.class.state=State
 admin.class.tab.fields=Fields
-admin.class.tab.statuses=Statuses
-admin.class.tab.priorities=Priorities
 admin.class.tab.forms=Forms
+admin.class.tab.priorities=Priorities
+admin.class.tab.statuses=Statuses
+admin.class.workspace=SECTIONS
 
 # Administration — fields
-admin.fields.headline=Fields
-admin.fields.empty=No fields are defined for this class.
-admin.fields.column.name=Name
-admin.fields.column.type=Type
-admin.fields.column.cardinality=Cardinality
-admin.fields.column.required=Required
-admin.fields.column.unique=Unique
-admin.fields.column.description=Description
-admin.fields.column.actions=Actions
 admin.fields.action.add=Add field
-admin.fields.action.save=Save
 admin.fields.action.clone=Duplicate
 admin.fields.action.delete-confirm=Really delete "{0}"?
+admin.fields.action.save=Save
+admin.fields.column.actions=Actions
+admin.fields.column.cardinality=Cardinality
+admin.fields.column.description=Description
+admin.fields.column.name=Name
+admin.fields.column.required=Required
+admin.fields.column.type=Type
+admin.fields.column.unique=Unique
+admin.fields.empty=No fields are defined for this class.
+admin.fields.headline=Fields
 
 # Administration — forms
-admin.forms.headline=Forms
-admin.forms.empty=No forms are defined for this class.
-admin.forms.column.name=Name
-admin.forms.column.description=Description
-admin.forms.column.portal-template=Portal template
 admin.forms.action.set-template=Set as portal template
 admin.forms.action.unset-template=Remove as portal template
+admin.forms.column.description=Description
+admin.forms.column.name=Name
+admin.forms.column.portal-template=Portal template
+admin.forms.empty=No forms are defined for this class.
+admin.forms.headline=Forms
 
 # Administration — priorities
-admin.priorities.headline=Priorities
-admin.priorities.empty=No priorities are defined for this class.
 admin.priorities.column.name=Name
+admin.priorities.empty=No priorities are defined for this class.
+admin.priorities.headline=Priorities
 
 # Administration — statuses
-admin.statuses.headline=Statuses
-admin.statuses.empty=No statuses are defined for this class.
-admin.statuses.column.name=Name
 admin.statuses.column.description=Description
+admin.statuses.column.name=Name
+admin.statuses.empty=No statuses are defined for this class.
+admin.statuses.headline=Statuses
 
 # Administration — REST API endpoint titles
-api.admin.workspaces.title=Workspaces (administration)
-api.admin.classes.title=Classes (administration)
 api.admin.class.portalvisible.title=Portal visibility of the class
-api.admin.fields.title=Fields (administration)
-api.admin.field.create.title=Create field
-api.admin.field.update.title=Update field
-api.admin.field.delete.title=Delete field
+api.admin.classes.title=Classes (administration)
 api.admin.field.clone.title=Duplicate field
-api.admin.forms.title=Forms (administration)
+api.admin.field.create.title=Create field
+api.admin.field.delete.title=Delete field
+api.admin.field.update.title=Update field
+api.admin.fields.title=Fields (administration)
 api.admin.form.portaltemplate.title=Portal template of the form
+api.admin.forms.title=Forms (administration)
 api.admin.priorities.title=Priorities (administration)
 api.admin.statuses.title=Statuses (administration)
+api.admin.workspaces.title=Workspaces (administration)
