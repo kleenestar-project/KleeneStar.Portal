@@ -1,4 +1,4 @@
-using KleeneStar.Core;
+﻿using KleeneStar.Core;
 using KleeneStar.Core.WebManager;
 using KleeneStar.Model;
 using KleeneStar.Model.Config;
@@ -46,6 +46,7 @@ namespace KleeneStar.Portal.Test
             ("_shareManager",     typeof(ShareManager)),
             ("_objectTagManager", typeof(ObjectTagManager)),
             ("_valueManager",     typeof(ValueManager)),
+            ("_commitManager",    typeof(CommitManager)),
             ("_templateManager",  typeof(TemplateManager)),
             ("_objectViewManager",typeof(ObjectViewManager)),
             ("_objectLinkManager",typeof(ObjectLinkManager)),
