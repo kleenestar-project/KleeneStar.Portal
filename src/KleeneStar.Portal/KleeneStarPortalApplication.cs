@@ -15,7 +15,6 @@ namespace KleeneStar.Portal
     [Name("kleenestar.portal:app.name")]
     [Description("kleenestar.portal:app.description")]
     [Icon("/assets/img/kleenestar.svg")]
-    [IconTheme(TypeIconTheme.Light)]
     [ContextPath("/portal")]
     public sealed class KleeneStarPortalApplication : IApplication
     {

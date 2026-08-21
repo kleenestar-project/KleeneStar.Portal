@@ -26,7 +26,7 @@ namespace KleeneStar.Portal.WebFragment
             : base(fragmentContext)
         {
             Text = _ => "kleenestar.portal:nav.org.label";
-            Icon = _ => new IconBuilding(TypeIconTheme.Light);
+            Icon = _ => new IconBuilding();
             Uri = _ => PortalHub.GetUri<WWW.Org.Index>();
         }
 

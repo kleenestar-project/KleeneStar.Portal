@@ -28,7 +28,7 @@ namespace KleeneStar.Portal.WebFragment
             : base(fragmentContext)
         {
             Text = _ => "kleenestar.portal:nav.admin.label";
-            Icon = _ => new IconSitemap(TypeIconTheme.Light);
+            Icon = _ => new IconSitemap();
         }
 
         /// <summary>

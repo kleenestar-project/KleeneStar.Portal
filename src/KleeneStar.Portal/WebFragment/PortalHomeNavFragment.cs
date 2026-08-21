@@ -27,7 +27,7 @@ namespace KleeneStar.Portal.WebFragment
             : base(fragmentContext)
         {
             Text = _ => "kleenestar.portal:nav.home.label";
-            Icon = _ => new IconHouse(TypeIconTheme.Light);
+            Icon = _ => new IconHouse();
         }
 
         /// <summary>

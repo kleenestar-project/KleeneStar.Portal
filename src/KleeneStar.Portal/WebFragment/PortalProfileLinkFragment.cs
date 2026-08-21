@@ -35,7 +35,7 @@ namespace KleeneStar.Portal.WebFragment
         {
             _componentHub = componentHub;
             Text = _ => "kleenestar.portal:profile.title";
-            Icon = _ => new IconCircleUser(TypeIconTheme.Light);
+            Icon = _ => new IconCircleUser();
             Uri = _ => PortalHub.GetUri<WWW.Profile.Index>();
         }
 

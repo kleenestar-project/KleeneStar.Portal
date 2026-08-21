@@ -50,7 +50,7 @@ namespace KleeneStar.Portal.WebFragment
         public PortalMineViewTableFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
-            Icon = _ => new IconTable(TypeIconTheme.Light);
+            Icon = _ => new IconTable();
             Title = _ => "kleenestar.core:view.table.title";
             Table.Bind = _ => new Binding()
                 .Add(new BindSearch() { Source = PortalMineViewSearchFragment.ContentId })

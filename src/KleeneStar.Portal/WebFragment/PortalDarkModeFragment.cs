@@ -32,7 +32,7 @@ namespace KleeneStar.Portal.WebFragment
         public PortalDarkModeFragment(IComponentHub componentHub, IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
-            Icon = _ => new IconMoon(TypeIconTheme.Light);
+            Icon = _ => new IconMoon();
             PrimaryAction = _ => new ActionDarkmode();
             Text = _ => "webexpress.webui:darkmode.label";
             Bind = ctx => new Binding().Add(new BindDarkmode
