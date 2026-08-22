@@ -57,6 +57,7 @@ namespace KleeneStar.Portal.Test
             ("_accessTokenManager", typeof(AccessTokenManager)),
             ("_savedSearchManager",typeof(SavedSearchManager)),
             ("_sprintManager",    typeof(SprintManager)),
+            ("_auditManager",     typeof(AuditManager)),
         ];
 
         /// <summary>
