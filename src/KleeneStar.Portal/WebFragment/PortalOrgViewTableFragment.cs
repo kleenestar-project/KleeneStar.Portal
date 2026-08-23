@@ -50,6 +50,11 @@ namespace KleeneStar.Portal.WebFragment
         public PortalOrgViewTableFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
+            // the table is the view here rather than a block among others, so it takes the
+            // height it is handed instead of growing with its rows: the rows then scroll under
+            // a column header that stays, and the pager stays in reach below them
+            Table.Fill = _ => true;
+
             Icon = _ => new IconTable();
             Title = _ => "kleenestar.core:view.table.title";
             Table.Bind = _ => new Binding()
