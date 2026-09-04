@@ -2,8 +2,7 @@
 
 	<PropertyGroup>
 		<TargetFramework>net10.0</TargetFramework>
-		<Version>0.0.3.0</Version>
-		<AssemblyVersion>0.0.3.0</AssemblyVersion>
+		<Version>0.0.3-alpha</Version>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<RepositoryUrl>https://github.com/kleenestar-project/KleeneStar.Portal</RepositoryUrl>
 		<EnableDynamicLoading>true</EnableDynamicLoading>
