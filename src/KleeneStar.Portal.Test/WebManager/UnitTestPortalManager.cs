@@ -1,3 +1,4 @@
+using KleeneStar.Core;
 using KleeneStar.Model.Entities;
 using KleeneStar.Portal.WebDomain;
 using KleeneStar.Portal.WebManager;
@@ -329,7 +330,7 @@ namespace KleeneStar.Portal.Test.WebManager
             // sharing the same name; both are exposed as request types.
             Assert.Equal(2, requestTypes.Count);
             var acme = requestTypes.Single(rt => rt.Description == "Incident management.");
-            Assert.Equal("incident", acme.Key);
+            Assert.Equal("sd-incident", acme.Key);
             Assert.Equal("Incident", acme.Title);
 
             var template = Assert.Single(acme.Templates);
@@ -345,9 +346,9 @@ namespace KleeneStar.Portal.Test.WebManager
         {
             var manager = Seed(nameof(GetRequestType_ByKey_IsCaseInsensitive));
 
-            Assert.NotNull(manager.GetRequestType("Incident"));
-            Assert.NotNull(manager.GetRequestType("INCIDENT"));
-            Assert.Null(manager.GetRequestType("problem"));
+            Assert.NotNull(manager.GetRequestType("SD-Incident"));
+            Assert.NotNull(manager.GetRequestType("SD-INCIDENT"));
+            Assert.Null(manager.GetRequestType("sd-problem"));
         }
 
         /// <summary>
@@ -493,7 +494,7 @@ namespace KleeneStar.Portal.Test.WebManager
             IIssue? created = null;
             manager.IssueCreated += (_, issue) => created = issue;
 
-            var result = manager.CreateIssue("incident", "self-service-form", "VPN drops the connection", "Drops every few minutes.", "P2");
+            var result = manager.CreateIssue("sd-incident", "self-service-form", "VPN drops the connection", "Drops every few minutes.", "P2");
 
             Assert.NotNull(result);
             // SD-1/SD-2 are portal issues, SD-3 is the internal problem record — the
@@ -520,7 +521,7 @@ namespace KleeneStar.Portal.Test.WebManager
             var manager = Seed(nameof(CreateIssue_ValidatesArguments));
 
             Assert.ThrowsAny<ArgumentException>(() => manager.CreateIssue(null!, null, "title", null, null));
-            Assert.ThrowsAny<ArgumentException>(() => manager.CreateIssue("incident", null, " ", null, null));
+            Assert.ThrowsAny<ArgumentException>(() => manager.CreateIssue("sd-incident", null, " ", null, null));
             Assert.Throws<InvalidOperationException>(() => manager.CreateIssue("unknown", null, "title", null, null));
         }
 
@@ -839,8 +840,9 @@ namespace KleeneStar.Portal.Test.WebManager
         }
 
         /// <summary>
-        /// The organization directory lists every active identity, ordered by name,
-        /// and the current user resolves to the fallback (seeded admin) identity.
+        /// The organization directory lists the active identities of the current user's
+        /// tenant, ordered by name, and the current user resolves to the fallback (seeded
+        /// admin) identity.
         /// </summary>
         [Fact]
         public void CurrentUser_And_OrganizationMembers_ResolveFromIdentityModel()
@@ -852,13 +854,231 @@ namespace KleeneStar.Portal.Test.WebManager
             Assert.Equal("Admin User", current.Name);
 
             var members = manager.GetOrganizationMembers();
-            // the seed now provisions four identities (admin, Anna, Gina, Sam) so
-            // the directory covers both tenants and an operator account.
-            Assert.Equal(4, members.Count);
+            // the seed provisions four identities (admin, Anna, Gina, Sam); the admin is
+            // Acme, so the directory is Acme - Gina (Globex) and Sam (no tenant) are not in it
+            Assert.Equal(2, members.Count);
             Assert.Equal("Admin User", members[0].Name);
             Assert.Equal("Anna Becker", members[1].Name);
-            Assert.Equal("Gina Globex", members[2].Name);
-            Assert.Equal("Operator Sam", members[3].Name);
+        }
+
+        /// <summary>
+        /// The directory is bounded by the caller's tenant: a Globex member sees Globex, an
+        /// operator-side account without a tenant sees nobody, and so does a caller the
+        /// system does not know. The no-caller overload stands in the seeded admin.
+        /// </summary>
+        [Fact]
+        public void GetOrganizationMembers_IsBoundedByTheCallersTenant()
+        {
+            var manager = Seed(nameof(GetOrganizationMembers_IsBoundedByTheCallersTenant));
+
+            var globex = manager.GetOrganizationMembers(GlobexMemberIdentityId);
+            Assert.Single(globex);
+            Assert.Equal("Gina Globex", globex[0].Name);
+
+            Assert.Empty(manager.GetOrganizationMembers(TenantlessIdentityId));
+            Assert.Empty(manager.GetOrganizationMembers(Guid.NewGuid()));
+            Assert.Empty(manager.GetOrganizationMembers(Guid.Empty));
+
+            var fallback = manager.GetOrganizationMembers(null);
+            Assert.Equal(2, fallback.Count);
+            Assert.Equal("Admin User", fallback[0].Name);
+            Assert.Equal("Anna Becker", fallback[1].Name);
+        }
+
+        /// <summary>
+        /// A disabled account is not in the directory even inside the tenant.
+        /// </summary>
+        [Fact]
+        public void GetOrganizationMembers_LeavesOutDisabledAccounts()
+        {
+            var manager = Seed(nameof(GetOrganizationMembers_LeavesOutDisabledAccounts));
+
+            using (var db = PortalHubFixture.CreateDbContext(nameof(GetOrganizationMembers_LeavesOutDisabledAccounts)))
+            {
+                var anna = db.Identities.First(i => i.Id == MemberIdentityId);
+                anna.State = IdentityState.Disabled;
+                db.SaveChanges();
+            }
+
+            var members = manager.GetOrganizationMembers();
+            Assert.Single(members);
+            Assert.Equal("Admin User", members[0].Name);
+        }
+
+        /// <summary>
+        /// A share is bounded the way the directory is: an identity of another tenant, an
+        /// operator account and an unparsable id are skipped, and the issue is only touched
+        /// when something was actually shared.
+        /// </summary>
+        [Fact]
+        public void ShareIssue_RefusesIdentitiesOutsideTheOrganization()
+        {
+            var manager = Seed(nameof(ShareIssue_RefusesIdentitiesOutsideTheOrganization));
+
+            var raised = 0;
+            manager.IssueShared += (_, _) => raised++;
+
+            var issue = manager.ShareIssue("SD-1", [GlobexMemberIdentityId.ToString(), TenantlessIdentityId.ToString(), "not-a-guid"]);
+
+            Assert.NotNull(issue);
+            Assert.Empty(issue.SharedWith);
+            Assert.Equal(0, raised);
+
+            issue = manager.ShareIssue("SD-1", [GlobexMemberIdentityId.ToString(), MemberIdentityId.ToString()]);
+
+            Assert.Single(issue!.SharedWith);
+            Assert.Equal("Anna Becker", issue.SharedWith[0].Name);
+            Assert.Equal(1, raised);
+        }
+
+        /// <summary>
+        /// Two workspaces may both offer an "Incident": the request-type key carries the
+        /// workspace key, so the two are distinct and each is addressed by its own key. The
+        /// bare class name addresses nothing any more.
+        /// </summary>
+        [Fact]
+        public void RequestTypeKeys_AreUniqueAcrossWorkspaces()
+        {
+            var manager = Seed(nameof(RequestTypeKeys_AreUniqueAcrossWorkspaces));
+
+            var keys = manager.GetRequestTypes().Select(rt => rt.Key).ToList();
+
+            Assert.Equal(2, keys.Count);
+            Assert.Equal(keys.Count, keys.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+            Assert.Contains("sd-incident", keys);
+            Assert.Contains("sdg-incident", keys);
+
+            Assert.Equal("Incident management.", manager.GetRequestType("sd-incident")!.Description);
+            Assert.Equal("Incident management (Globex).", manager.GetRequestType("sdg-incident")!.Description);
+            Assert.Null(manager.GetRequestType("incident"));
+        }
+
+        /// <summary>
+        /// Creating an issue against the Globex request type files it in the Globex
+        /// workspace, under that workspace's key sequence, although the class carries the
+        /// same name as the Acme one.
+        /// </summary>
+        [Fact]
+        public void CreateIssue_AddressesTheRequestTypeByWorkspace()
+        {
+            var manager = Seed(nameof(CreateIssue_AddressesTheRequestTypeByWorkspace));
+
+            var result = manager.CreateIssue("SDG-Incident", null, "Globex mail down", null, null);
+
+            Assert.NotNull(result);
+            Assert.Equal("SDG-2", result.Key);
+            Assert.Equal("Incident management (Globex).", result.RequestType?.Description);
+
+            Assert.Throws<InvalidOperationException>(() => manager.CreateIssue("incident", null, "no workspace named", null, null));
+        }
+
+        /// <summary>
+        /// Seeds an active workflow on the Incident class - every seeded status takes part,
+        /// New is the entry, and the moves the cases need are declared - and binds the
+        /// workflow field to it.
+        /// </summary>
+        /// <param name="connectionString">The per-test in-memory database name.</param>
+        /// <returns>The status ids by name.</returns>
+        private static Dictionary<string, Guid> SeedWorkflow(string connectionString)
+        {
+            using var db = PortalHubFixture.CreateDbContext(connectionString);
+
+            var statuses = db.Statuses
+                .Where(s => s.ClassId == IncidentClassId)
+                .ToDictionary(s => s.Name, s => s.Id);
+
+            var workflowId = Guid.NewGuid();
+
+            db.Workflows.Add(new Workflow
+            {
+                Id = workflowId,
+                Name = "Incident Lifecycle",
+                ClassId = IncidentClassId,
+                State = WorkflowState.Active,
+                WorkflowStatuses = [.. statuses.Select(s => new WorkflowStatus { StatusId = s.Value, IsStart = s.Key == "New" })]
+            });
+
+            void addTransition(string name, string from, string to) => db.Transitions.Add(new Transition
+            {
+                Name = name,
+                WorkflowId = workflowId,
+                SourceId = statuses[from],
+                TargetId = statuses[to],
+                State = TransitionState.Active
+            });
+
+            addTransition("Start", "New", "In Progress");
+            addTransition("Ask", "In Progress", "Waiting on Requester");
+            addTransition("Resolve", "In Progress", "Resolved");
+            addTransition("Resolve again", "Waiting on Requester", "Resolved");
+            addTransition("Close", "Resolved", "Closed");
+
+            var field = db.Fields.First(f => f.Id == WorkflowFieldId);
+            field.WorkflowId = workflowId;
+
+            db.SaveChanges();
+
+            return statuses;
+        }
+
+        /// <summary>
+        /// Once connected, an operator-side workflow move that stamps a portal issue with a
+        /// resolved state raises the portal's resolution event with the projected issue; a
+        /// move to any other state does not.
+        /// </summary>
+        [Fact]
+        public void Connect_RaisesResolutionProposedFromAWorkflowMove()
+        {
+            var manager = Seed(nameof(Connect_RaisesResolutionProposedFromAWorkflowMove));
+            var statuses = SeedWorkflow(nameof(Connect_RaisesResolutionProposedFromAWorkflowMove));
+
+            var proposed = new List<IIssue>();
+            manager.IssueResolutionProposed += (_, issue) => proposed.Add(issue);
+
+            manager.Connect();
+
+            // SD-2 is New: starting work is not a proposal
+            var started = CoreHub.WorkflowManager.ExecuteTransition(ForeignObjectId, WorkflowFieldId, statuses["In Progress"], PortalManager.FallbackIdentityId);
+            Assert.True(started.Succeeded);
+            Assert.Empty(proposed);
+
+            // SD-1 is In Progress: resolving it is
+            var resolved = CoreHub.WorkflowManager.ExecuteTransition(MineObjectId, WorkflowFieldId, statuses["Resolved"], PortalManager.FallbackIdentityId);
+            Assert.True(resolved.Succeeded);
+
+            var issue = Assert.Single(proposed);
+            Assert.Equal("SD-1", issue.Key);
+            Assert.Equal(PortalIssueState.Resolved, issue.PortalState);
+
+            // closing is terminal, not a proposal
+            var closed = CoreHub.WorkflowManager.ExecuteTransition(MineObjectId, WorkflowFieldId, statuses["Closed"], PortalManager.FallbackIdentityId);
+            Assert.True(closed.Succeeded);
+            Assert.Single(proposed);
+        }
+
+        /// <summary>
+        /// A move that the workflow refuses raises nothing, and connecting twice subscribes
+        /// once.
+        /// </summary>
+        [Fact]
+        public void Connect_IsIdempotentAndIgnoresRefusedMoves()
+        {
+            var manager = Seed(nameof(Connect_IsIdempotentAndIgnoresRefusedMoves));
+            var statuses = SeedWorkflow(nameof(Connect_IsIdempotentAndIgnoresRefusedMoves));
+
+            var proposed = 0;
+            manager.IssueResolutionProposed += (_, _) => proposed++;
+
+            manager.Connect();
+            manager.Connect();
+
+            // SD-2 is New and the workflow declares no move from New to Resolved
+            var refused = CoreHub.WorkflowManager.ExecuteTransition(ForeignObjectId, WorkflowFieldId, statuses["Resolved"], PortalManager.FallbackIdentityId);
+            Assert.False(refused.Succeeded);
+            Assert.Equal(0, proposed);
+
+            CoreHub.WorkflowManager.ExecuteTransition(MineObjectId, WorkflowFieldId, statuses["Resolved"], PortalManager.FallbackIdentityId);
+            Assert.Equal(1, proposed);
         }
 
         /// <summary>

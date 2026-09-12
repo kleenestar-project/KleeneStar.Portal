@@ -68,6 +68,21 @@ namespace KleeneStar.Portal.WebManager
         IReadOnlyList<IssueParticipant> GetOrganizationMembers();
 
         /// <summary>
+        /// Gets the directory of the organization <paramref name="callerId"/> belongs to: the
+        /// active identities of the caller's tenant, the caller included, ordered by name.
+        /// </summary>
+        /// <remarks>
+        /// An organization is a tenant. A caller that belongs to none - an operator-side account,
+        /// or an identity the system does not know - has no organization to list and is answered
+        /// with an empty directory, never with everyone: this list is what the share dialog
+        /// offers, and sharing is bounded by the tenant (concept: <i>identities of the same
+        /// tenant</i>).
+        /// </remarks>
+        /// <param name="callerId">The acting identity, or <see langword="null"/> for the fallback.</param>
+        /// <returns>The organization members, or an empty list.</returns>
+        IReadOnlyList<IssueParticipant> GetOrganizationMembers(Guid? callerId);
+
+        /// <summary>
         /// Returns the request types visible to the calling identity in the active
         /// workspace/tenant context.
         /// </summary>
@@ -343,5 +358,13 @@ namespace KleeneStar.Portal.WebManager
         /// <param name="objectId">The underlying object id.</param>
         /// <returns>The projected issue when the event was raised, <see langword="null"/> otherwise.</returns>
         IIssue NotifyResolutionProposed(Guid objectId);
+
+        /// <summary>
+        /// Subscribes the portal to the operator-side events it derives its own from: a workflow
+        /// transition that stamps a portal-visible object with a resolved state raises
+        /// <see cref="IssueResolutionProposed"/> through <see cref="NotifyResolutionProposed"/>.
+        /// Called once when the portal application starts; calling it again does nothing.
+        /// </summary>
+        void Connect();
     }
 }

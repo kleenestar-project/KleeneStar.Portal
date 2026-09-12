@@ -49,6 +49,11 @@ namespace KleeneStar.Portal.WebManager
         private readonly object _gate = new();
 
         /// <summary>
+        /// Whether <see cref="Connect"/> has subscribed to the operator-side events already.
+        /// </summary>
+        private bool _connected;
+
+        /// <summary>
         /// Identity used as the acting portal user while the WebExpress identity flow
         /// does not yet expose the authenticated identity on the request. Mirrors the
         /// fallback of <c>KleeneStar.Core.WebManager.SessionManager</c> (the seeded
@@ -75,11 +80,10 @@ namespace KleeneStar.Portal.WebManager
         // Raised when the operator side proposes a resolution: the underlying object
         // is stamped with a Done-category, non-terminal status (e.g. "Resolved",
         // "Awaiting Confirmation") and the issue becomes the user-facing "Resolved"
-        // state. The portal itself only accepts or rejects, so this event is raised
-        // by operator-side workflow transitions — call
-        // <see cref="NotifyResolutionProposed(Guid)"/> from the operator workflow
-        // code the moment a status in the Done category is stamped onto a
-        // portal-visible object.
+        // state. The portal itself only accepts or rejects, so this event follows the
+        // operator-side workflow: Connect() listens to the workflow manager's
+        // TransitionExecuted and hands every completed move to
+        // NotifyResolutionProposed, which decides whether it was a proposal.
         public event EventHandler<IIssue> IssueResolutionProposed;
         /// <inheritdoc/>
         public event EventHandler<IIssue> IssueResolutionAccepted;
@@ -106,9 +110,25 @@ namespace KleeneStar.Portal.WebManager
         /// <inheritdoc/>
         public IReadOnlyList<IssueParticipant> GetOrganizationMembers()
         {
+            return GetOrganizationMembers(FallbackIdentityId);
+        }
+
+        /// <inheritdoc/>
+        public IReadOnlyList<IssueParticipant> GetOrganizationMembers(Guid? callerId)
+        {
+            var me = callerId ?? FallbackIdentityId;
+            var caller = me == Guid.Empty ? null : CoreHub.IdentityManager.GetIdentity(me);
+
+            // no tenant, no organization: an operator-side account has no colleagues in the
+            // portal's sense, and an unknown caller is not told who works where
+            if (caller?.TenantId is not Guid tenantId)
+            {
+                return [];
+            }
+
             return [.. CoreHub.IdentityManager
                 .GetIdentities(new Query<Identity>())
-                .Where(i => i.State == IdentityState.Active)
+                .Where(i => i.State == IdentityState.Active && i.TenantId == tenantId)
                 .OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase)
                 .Select(ToParticipant)];
         }
@@ -244,7 +264,7 @@ namespace KleeneStar.Portal.WebManager
             lock (_gate)
             {
                 var cls = GetPortalClasses()
-                    .FirstOrDefault(c => string.Equals(Slug(c.Name), Slug(requestTypeKey), StringComparison.OrdinalIgnoreCase))
+                    .FirstOrDefault(c => string.Equals(RequestTypeKey(c), Slug(requestTypeKey), StringComparison.OrdinalIgnoreCase))
                     ?? throw new InvalidOperationException($"Request type '{requestTypeKey}' not found.");
 
                 var context = BuildClassContext(cls);
@@ -363,9 +383,17 @@ namespace KleeneStar.Portal.WebManager
 
             var added = 0;
 
+            // the share dialog offers the caller's organization, and what it did not offer is
+            // not accepted from a hand-made request either (concept: a cross-tenant share is
+            // refused); an identity outside it is skipped, not shared
+            var organization = GetOrganizationMembers()
+                .Select(m => m.Id)
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
             foreach (var raw in identityIds)
             {
-                if (!Guid.TryParse(raw, out var identityId))
+                if (!Guid.TryParse(raw, out var identityId) || !organization.Contains(identityId.ToString()))
                 {
                     continue;
                 }
@@ -844,6 +872,50 @@ namespace KleeneStar.Portal.WebManager
             return null;
         }
 
+        /// <inheritdoc/>
+        public void Connect()
+        {
+            lock (_gate)
+            {
+                if (_connected)
+                {
+                    return;
+                }
+
+                _connected = true;
+            }
+
+            // every completed move is offered; NotifyResolutionProposed keeps the ones that
+            // stamped a portal-visible object with a resolved state and drops the rest
+            CoreHub.WorkflowManager.TransitionExecuted += (_, result) => OnTransitionExecuted(result);
+        }
+
+        /// <summary>
+        /// Derives the portal's resolution event from a completed workflow transition.
+        /// </summary>
+        /// <remarks>
+        /// The handler runs inside the operator's transition, so a failure here must not
+        /// reach the workflow: the move was legitimate, and the portal not being told is the
+        /// smaller fault. It is logged and the transition completes.
+        /// </remarks>
+        /// <param name="result">The completed transition.</param>
+        private void OnTransitionExecuted(WorkflowTransitionResult result)
+        {
+            if (result?.Outcome != WorkflowTransitionOutcome.Executed)
+            {
+                return;
+            }
+
+            try
+            {
+                NotifyResolutionProposed(result.ObjectId);
+            }
+            catch (Exception ex)
+            {
+                _httpServerContext?.Log?.Exception(ex);
+            }
+        }
+
         /// <summary>
         /// Returns the active, non-abstract classes flagged portal-visible, ordered by
         /// name so the catalog (and the palette assignment) is stable.
@@ -877,12 +949,34 @@ namespace KleeneStar.Portal.WebManager
 
             return new RequestType
             {
-                Key = Slug(cls.Name),
+                Key = RequestTypeKey(cls),
                 Title = cls.Name,
                 Description = cls.Description,
                 Icon = cls.Icon,
                 Templates = templates
             };
+        }
+
+        /// <summary>
+        /// Derives the stable key of the request type a class is offered as.
+        /// </summary>
+        /// <remarks>
+        /// A class name is unique per workspace, not per installation - two service desks may
+        /// both offer an <c>Incident</c> - so the key carries the workspace key in front of the
+        /// class name: <c>sd-incident</c>. The workspace key is unique across the installation,
+        /// which makes the pair unique; a class whose workspace is gone or carries no key falls
+        /// back to the class name alone, so it can still be addressed.
+        /// </remarks>
+        /// <param name="cls">The portal-visible class.</param>
+        /// <returns>The request-type key.</returns>
+        internal static string RequestTypeKey(Class cls)
+        {
+            var workspaceKey = CoreHub.WorkspaceManager.GetWorkspace(cls.WorkspaceId)?.Key;
+            var prefix = Slug(workspaceKey);
+
+            return string.IsNullOrEmpty(prefix)
+                ? Slug(cls.Name)
+                : Slug(prefix + "-" + cls.Name);
         }
         /// <summary>
         /// Returns the active forms of the given class that are flagged as portal

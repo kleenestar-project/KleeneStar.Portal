@@ -36,6 +36,9 @@ namespace KleeneStar.Portal
         /// </summary>
         public void Run()
         {
+            // the portal derives its own lifecycle events from the operator side's; the
+            // subscription is made here, once every manager of both applications exists
+            PortalHub.PortalManager.Connect();
         }
     }
 }
