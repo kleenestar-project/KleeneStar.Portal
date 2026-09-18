@@ -1,7 +1,7 @@
 ﻿using KleeneStar.Core;
 using KleeneStar.Core.WebManager;
 using KleeneStar.Model;
-using KleeneStar.Model.Config;
+using KleeneStar.Model.Settings;
 using KleeneStar.Portal.WebManager;
 using System.Reflection;
 using WebExpress.WebCore;
@@ -82,7 +82,7 @@ namespace KleeneStar.Portal.Test
         /// <returns>The portal manager under test.</returns>
         public static PortalManager Initialize(string connectionString)
         {
-            ModelHub.DatabaseConfig = new DbConfig
+            ModelHub.DatabaseSettings = new DatabaseSettings
             {
                 Assembly = "KleeneStar.Portal.Test",
                 ConnectionString = connectionString

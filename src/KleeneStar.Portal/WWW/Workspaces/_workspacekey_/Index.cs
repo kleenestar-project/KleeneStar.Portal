@@ -112,7 +112,7 @@ namespace KleeneStar.Portal.WWW.Workspaces._workspacekey_
                 var capturedDescription = cls.Description ?? string.Empty;
                 var badge = cls.PortalVisible ? PortalVisibleResource : InternalResource;
 
-                var tile = new ControlPanelCard($"portal-class-tile-{cls.Id}")
+                var tile = new ControlCard($"portal-class-tile-{cls.Id}")
                 {
                     Header = _ => capturedName,
                     Margin = _ => new PropertySpacingMargin(PropertySpacing.Space.One, PropertySpacing.Space.One, PropertySpacing.Space.One, PropertySpacing.Space.One)
