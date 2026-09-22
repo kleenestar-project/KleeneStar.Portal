@@ -87,5 +87,11 @@ namespace KleeneStar.Portal.WebDomain
         /// Gets the conversation timeline (human comments + system notes).
         /// </summary>
         IReadOnlyList<IssueComment> Comments { get; }
+
+        /// <summary>
+        /// Gets the relations to other portal issues the caller may open. Empty in list
+        /// projections.
+        /// </summary>
+        IReadOnlyList<IssueRelation> Relations { get; }
     }
 }

@@ -84,6 +84,9 @@ namespace KleeneStar.Portal.WWW.Issues._issuekey_
         /// <summary>Resource key for the shared-with heading.</summary>
         public const string SharedWithHeadingResource = "kleenestar.portal:issue.shared-with.heading";
 
+        /// <summary>Resource key for the related-issues heading.</summary>
+        public const string RelationsHeadingResource = "kleenestar.portal:issue.relations.heading";
+
         /// <summary>Resource key for the watchers heading.</summary>
         public const string WatchersHeadingResource = "kleenestar.portal:issue.watchers.heading";
 
@@ -273,6 +276,43 @@ namespace KleeneStar.Portal.WWW.Issues._issuekey_
                 );
             }
             visualTree.Content.MainPanel.AddPrimary(details);
+
+            // related issues - only the ones the portal lets the caller open, see
+            // PortalManager.BuildRelations
+            if (issue.Relations.Count > 0)
+            {
+                var relationsHeading = Format(RelationsHeadingResource, issue.Relations.Count);
+
+                visualTree.Content.MainPanel.AddPrimary(new ControlText()
+                {
+                    Text = _ => relationsHeading,
+                    TextColor = _ => new PropertyColorText(TypeColorText.Secondary),
+                    Margin = _ => new PropertySpacingMargin(PropertySpacing.Space.Three, PropertySpacing.Space.None, PropertySpacing.Space.One, PropertySpacing.Space.None)
+                });
+
+                var relations = new ControlTable() { Striped = _ => TypeStripedTable.Row, SuppressHeaders = _ => true }
+                    .AddColumn("")
+                    .AddColumn("")
+                    .AddColumn("");
+                foreach (var relation in issue.Relations)
+                {
+                    // the caption is an i18n key for a seeded relation type and free text for
+                    // one an administrator wrote; Translate hands the latter back unchanged,
+                    // and a table cell would print either verbatim
+                    var label = Translate(relation.Label);
+                    var text = $"{relation.Key} · {relation.Title}";
+                    var state = PortalFormatter.FormatPortalState(relation.PortalState, Translate);
+                    var uri = PortalHub.GetUri<Index>()?.BindParameters(new IssueKeyParameter(relation.Key));
+
+                    relations = relations.AddRow
+                    (
+                        new ControlTableCell() { Text = _ => label },
+                        new ControlTableCellPanel().Add(new ControlLink() { Text = _ => text, Uri = _ => uri }),
+                        new ControlTableCell() { Text = _ => state }
+                    );
+                }
+                visualTree.Content.MainPanel.AddPrimary(relations);
+            }
 
             // shared with
             if (issue.SharedWith.Count > 0)

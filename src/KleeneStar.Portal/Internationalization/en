@@ -84,6 +84,7 @@ issue.history.entry.singular=entry
 issue.history.heading=HISTORY · {0} {1}
 issue.note.label=Note
 issue.not-found=Issue '{0}' was not found or is not shared with you.
+issue.relations.heading=RELATED ISSUES ({0})
 issue.resolution.banner=Resolution proposed. Please review and confirm that your request is resolved.
 issue.shared-with.heading=SHARED WITH ({0})
 issue.system=System

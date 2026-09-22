@@ -61,6 +61,8 @@ The portal additionally relies on two relationship concepts that are layered on 
 - **Sharing**: An explicit `Link` between an `Object` (the issue) and an `Identity` (a user from the same tenant) that grants the linked identity read/comment access to the issue without making them the requester. Shared identities appear in the issue's "Shared with" panel.
 - **Watching**: A subscription `Link` between an `Identity` and an `Object`. Watchers receive notifications on relevant state and comment events but do not gain additional read rights beyond what their group profile already permits.
 
+Beside these, the issue detail shows the **relations** of the underlying object (`ObjectRelation`, see `KleeneStar.Core/docs/kleenestar.relation.md`) under *Related issues*: caption as read from this issue's side (the inverse label where it is the target), the far end's key and title linked to its portal page, and its collapsed state. The projection is deliberately narrow - a relation is shown only when its far end is itself a portal issue the caller could open by key (a portal-visible class, read through `ObjectManager` so security levels apply). Links to internal records, to external addresses and obsolete relations stay on the operator side. The portal only reads relations; creating and removing them remains an operator action. `GET /api/1/issues/{issuekey}` carries the same list as `relations`, with the caption as stored (an i18n key for a seeded type).
+
 ```
 ╔══════════════════════════════════════════════════════════════════════════════════════╗
 ║                             KleeneStar Core Data Model                               ║

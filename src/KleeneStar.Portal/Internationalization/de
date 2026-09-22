@@ -84,6 +84,7 @@ issue.history.entry.singular=Eintrag
 issue.history.heading=VERLAUF · {0} {1}
 issue.note.label=Hinweis
 issue.not-found=Vorgang '{0}' wurde nicht gefunden oder ist nicht für dich freigegeben.
+issue.relations.heading=VERKNÜPFTE VORGÄNGE ({0})
 issue.resolution.banner=Lösung vorgeschlagen. Bitte prüfen und bestätigen, dass dein Anliegen behoben ist.
 issue.shared-with.heading=GETEILT MIT ({0})
 issue.system=System

@@ -54,5 +54,8 @@ namespace KleeneStar.Portal.WebDomain
 
         /// <inheritdoc/>
         public IReadOnlyList<IssueComment> Comments { get; init; } = [];
+
+        /// <inheritdoc/>
+        public IReadOnlyList<IssueRelation> Relations { get; init; } = [];
     }
 }

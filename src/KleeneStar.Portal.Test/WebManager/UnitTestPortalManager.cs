@@ -461,6 +461,83 @@ namespace KleeneStar.Portal.Test.WebManager
         }
 
         /// <summary>
+        /// Stores a <c>blocks</c> relation type (seeded-catalog style, i18n-key captions)
+        /// and the supplied relations.
+        /// </summary>
+        /// <param name="connectionString">The per-test in-memory database name.</param>
+        /// <param name="relations">The relations to store.</param>
+        private static void SeedRelations(string connectionString, params ObjectRelation[] relations)
+        {
+            using var db = PortalHubFixture.CreateDbContext(connectionString);
+
+            db.ObjectRelationTypes.Add(new ObjectRelationType
+            {
+                Key = "blocks",
+                Label = "webexpress.webapp:relation.type.blocks.label",
+                InverseLabel = "webexpress.webapp:relation.type.blocks.inverse",
+                Created = DateTime.UtcNow,
+                Updated = DateTime.UtcNow
+            });
+
+            foreach (var relation in relations)
+            {
+                relation.TypeKey ??= "blocks";
+                relation.Created = DateTime.UtcNow;
+                relation.Updated = DateTime.UtcNow;
+                db.ObjectRelations.Add(relation);
+            }
+
+            db.SaveChanges();
+        }
+
+        /// <summary>
+        /// A relation between two portal issues is projected on both of them: the far end's
+        /// key, title and collapsed state, captioned from each issue's own side.
+        /// </summary>
+        [Fact]
+        public void GetIssue_ProjectsRelationsFromEitherSide()
+        {
+            var connectionString = nameof(GetIssue_ProjectsRelationsFromEitherSide);
+            var manager = Seed(connectionString);
+            SeedRelations(connectionString, new ObjectRelation { SourceObjectId = MineObjectId, TargetObjectId = ForeignObjectId });
+
+            var source = Assert.Single(manager.GetIssue("SD-1").Relations);
+            Assert.True(source.IsOutgoing);
+            Assert.Equal("webexpress.webapp:relation.type.blocks.label", source.Label);
+            Assert.Equal("SD-2", source.Key);
+            Assert.Equal("Printer prints stripes", source.Title);
+            Assert.Equal(PortalIssueState.Open, source.PortalState);
+
+            var target = Assert.Single(manager.GetIssue("SD-2").Relations);
+            Assert.False(target.IsOutgoing);
+            Assert.Equal("webexpress.webapp:relation.type.blocks.inverse", target.Label);
+            Assert.Equal("SD-1", target.Key);
+            Assert.Equal(PortalIssueState.InProgress, target.PortalState);
+        }
+
+        /// <summary>
+        /// A relation to an internal record, to an external address, or one marked obsolete
+        /// never reaches the portal; the list projections carry no relations at all.
+        /// </summary>
+        [Fact]
+        public void GetIssue_HidesInternalExternalAndObsoleteRelations()
+        {
+            var connectionString = nameof(GetIssue_HidesInternalExternalAndObsoleteRelations);
+            var manager = Seed(connectionString);
+            SeedRelations
+            (
+                connectionString,
+                new ObjectRelation { SourceObjectId = MineObjectId, TargetObjectId = InternalObjectId },
+                new ObjectRelation { SourceObjectId = InternalObjectId, TargetObjectId = MineObjectId },
+                new ObjectRelation { SourceObjectId = MineObjectId, TypeKey = "web-link", TargetUri = "https://intranet.example/kb/42", TargetTitle = "KB 42" },
+                new ObjectRelation { SourceObjectId = MineObjectId, TargetObjectId = ForeignObjectId, Status = WebExpress.WebApp.WebRelation.RelationStatus.Obsolete }
+            );
+
+            Assert.Empty(manager.GetIssue("SD-1").Relations);
+            Assert.All(manager.GetIssues(IssueScope.Mine), i => Assert.Empty(i.Relations));
+        }
+
+        /// <summary>
         /// The category of the stamped status drives the collapsed portal state:
         /// To-Do reads Open, Waiting reads WaitingOnRequester, the Done category splits
         /// into Resolved (non-terminal name) and Closed (terminal name).

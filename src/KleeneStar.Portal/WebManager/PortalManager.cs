@@ -1082,8 +1082,89 @@ namespace KleeneStar.Portal.WebManager
             var shares = CoreHub.ShareManager.GetShares(entity.Id).ToList();
             var watchers = CoreHub.WatcherManager.GetWatchers(entity.Id).ToList();
             var comments = CoreHub.CommentManager.GetComments(entity.Id).ToList();
+            var relations = BuildRelations(entity);
 
-            return BuildIssue(entity, context, requestType, shares, watchers, comments);
+            return BuildIssue(entity, context, requestType, shares, watchers, comments, relations);
+        }
+
+        /// <summary>
+        /// Projects the relations of an object onto the links a portal reader is shown.
+        /// </summary>
+        /// <remarks>
+        /// The portal is a constrained view, so a relation is projected only when its far
+        /// end is itself a portal issue the caller could open by key: an object of a
+        /// portal-visible class, answered by <c>ObjectManager</c> (which applies the security
+        /// levels). A link to an internal record - a problem, a change, a bug in the
+        /// development workspace - or to an external address stays on the operator side:
+        /// its key, title and state are the service team's working material, not the
+        /// requester's. Obsolete relations are history and are left out as well. The caption
+        /// is read from this issue's side, the inverse label where it is the target.
+        /// </remarks>
+        /// <param name="entity">The object whose relations are projected.</param>
+        /// <returns>The projected relations, ordered by caption and key.</returns>
+        private static List<IssueRelation> BuildRelations(ObjectEntity entity)
+        {
+            var contexts = new Dictionary<Guid, ClassContext>();
+            var relations = new List<IssueRelation>();
+
+            foreach (var relation in CoreHub.ObjectRelationManager.GetRelations(entity.Id))
+            {
+                if (relation.Status == WebExpress.WebApp.WebRelation.RelationStatus.Obsolete
+                    || relation.TargetObjectId is null)
+                {
+                    continue;
+                }
+
+                var outgoing = relation.SourceObjectId == entity.Id;
+                var otherId = outgoing ? relation.TargetObjectId.Value : relation.SourceObjectId;
+
+                if (otherId == entity.Id)
+                {
+                    continue;
+                }
+
+                // re-read through the object manager rather than the navigation property,
+                // so the caller's clearance decides whether the far end exists for them
+                var other = CoreHub.ObjectManager.GetObject(otherId);
+                if (other is null)
+                {
+                    continue;
+                }
+
+                if (!contexts.TryGetValue(other.ClassId, out var context))
+                {
+                    var cls = CoreHub.ClassManager.GetClass(other.ClassId);
+                    context = cls is not null && cls.PortalVisible ? BuildClassContext(cls) : null;
+                    contexts[other.ClassId] = context;
+                }
+
+                if (context is null)
+                {
+                    continue;
+                }
+
+                var type = CoreHub.ObjectRelationTypeManager.GetRelationType(relation.TypeKey);
+                var label = type is null
+                    ? relation.TypeKey
+                    : outgoing || type.Symmetric || string.IsNullOrWhiteSpace(type.InverseLabel)
+                        ? type.Label
+                        : type.InverseLabel;
+
+                relations.Add(new IssueRelation
+                {
+                    Id = relation.Id.ToString(),
+                    TypeKey = relation.TypeKey,
+                    Label = string.IsNullOrWhiteSpace(label) ? relation.TypeKey : label,
+                    IsOutgoing = outgoing,
+                    Key = other.Key,
+                    Title = other.Summary,
+                    PortalState = ResolvePortalState(other.Id, context)
+                });
+            }
+
+            return [.. relations
+                .OrderBy(r => r.Label, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(r => r.Key, StringComparer.OrdinalIgnoreCase)];
         }
 
         /// <summary>
@@ -1097,6 +1178,7 @@ namespace KleeneStar.Portal.WebManager
         /// <param name="shares">The share relations of the object, or <see langword="null"/>.</param>
         /// <param name="watchers">The watch relations of the object, or <see langword="null"/>.</param>
         /// <param name="comments">The comments of the object, or <see langword="null"/> to omit.</param>
+        /// <param name="relations">The projected relations, or <see langword="null"/> to omit.</param>
         /// <returns>The issue projection.</returns>
         private static Issue BuildIssue
         (
@@ -1105,7 +1187,8 @@ namespace KleeneStar.Portal.WebManager
             IRequestType requestType,
             IReadOnlyList<ObjectShare> shares,
             IReadOnlyList<ObjectWatcher> watchers,
-            IReadOnlyList<Comment> comments
+            IReadOnlyList<Comment> comments,
+            IReadOnlyList<IssueRelation> relations = null
         )
         {
             var requester = ToParticipant(ResolveIdentity(entity.CreatorId, entity.Creator));
@@ -1150,7 +1233,8 @@ namespace KleeneStar.Portal.WebManager
                 Updated = entity.Updated,
                 SharedWith = sharedWith,
                 Watchers = watching,
-                Comments = timeline
+                Comments = timeline,
+                Relations = relations ?? []
             };
         }
 

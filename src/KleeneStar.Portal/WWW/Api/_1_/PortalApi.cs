@@ -220,7 +220,29 @@ namespace KleeneStar.Portal.WWW.Api._1_
                 Watchers = [.. issue.Watchers.Select(ToDto)],
                 Comments = includeTimeline
                     ? [.. issue.Comments.Select(ToDto)]
+                    : null,
+                Relations = includeTimeline
+                    ? [.. issue.Relations.Select(ToDto)]
                     : null
+            };
+        }
+
+        /// <summary>
+        /// Projects a relation onto its wire shape.
+        /// </summary>
+        /// <param name="relation">The relation.</param>
+        /// <returns>The DTO.</returns>
+        internal static RelationDto ToDto(IssueRelation relation)
+        {
+            return new RelationDto
+            {
+                Id = relation.Id,
+                Type = relation.TypeKey,
+                Label = relation.Label,
+                Outgoing = relation.IsOutgoing,
+                Key = relation.Key,
+                Title = relation.Title,
+                State = relation.PortalState
             };
         }
 
@@ -346,6 +368,33 @@ namespace KleeneStar.Portal.WWW.Api._1_
         }
 
         /// <summary>
+        /// The wire shape of a relation to another issue.
+        /// </summary>
+        internal sealed class RelationDto
+        {
+            /// <summary>Gets or sets the relation id.</summary>
+            public string Id { get; init; }
+
+            /// <summary>Gets or sets the key of the relation type.</summary>
+            public string Type { get; init; }
+
+            /// <summary>Gets or sets the caption as read from this issue (an i18n key or text).</summary>
+            public string Label { get; init; }
+
+            /// <summary>Gets or sets whether this issue is the source of the relation.</summary>
+            public bool Outgoing { get; init; }
+
+            /// <summary>Gets or sets the key of the related issue.</summary>
+            public string Key { get; init; }
+
+            /// <summary>Gets or sets the title of the related issue.</summary>
+            public string Title { get; init; }
+
+            /// <summary>Gets or sets the collapsed portal state of the related issue.</summary>
+            public PortalIssueState State { get; init; }
+        }
+
+        /// <summary>
         /// The wire shape of an issue.
         /// </summary>
         internal sealed class IssueDto
@@ -391,6 +440,9 @@ namespace KleeneStar.Portal.WWW.Api._1_
 
             /// <summary>Gets or sets the timeline, or <see langword="null"/> in list projections.</summary>
             public IReadOnlyList<CommentDto> Comments { get; init; }
+
+            /// <summary>Gets or sets the relations to other issues, or <see langword="null"/> in list projections.</summary>
+            public IReadOnlyList<RelationDto> Relations { get; init; }
         }
     }
 }
