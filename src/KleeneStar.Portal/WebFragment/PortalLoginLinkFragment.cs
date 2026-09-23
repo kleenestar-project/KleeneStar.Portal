@@ -1,5 +1,4 @@
 using KleeneStar.Portal.WebScope;
-using WebExpress.WebApp.WebCondition;
 using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
@@ -23,7 +22,7 @@ namespace KleeneStar.Portal.WebFragment
     /// </remarks>
     [Section<SectionAppAvatarSecondary>]
     [Scope<IScopePortal>]
-    [Condition<ConditionLogout>]
+    [Condition<global::KleeneStar.Core.WebIdentity.SignedOutCondition>]
     [Cache]
     public sealed class PortalLoginLinkFragment : FragmentControlDropdownItemLink
     {

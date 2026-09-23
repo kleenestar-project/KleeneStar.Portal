@@ -1,6 +1,5 @@
 using KleeneStar.Core;
 using KleeneStar.Portal.WebScope;
-using WebExpress.WebApp.WebCondition;
 using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebData;
 using WebExpress.WebApp.WebSection;
@@ -33,7 +32,7 @@ namespace KleeneStar.Portal.WebFragment
     /// </remarks>
     [Section<SectionBodySecondary>]
     [Scope<IScopePortal>]
-    [Condition<ConditionLogout>]
+    [Condition<global::KleeneStar.Core.WebIdentity.SignedOutCondition>]
     [Cache]
     public sealed class PortalLoginModalFragment : ControlDataModalLogin, IFragmentControl<ControlDataModalLogin>
     {

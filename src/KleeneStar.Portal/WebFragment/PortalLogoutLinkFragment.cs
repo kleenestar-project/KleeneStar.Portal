@@ -1,5 +1,4 @@
 using KleeneStar.Portal.WebScope;
-using WebExpress.WebApp.WebCondition;
 using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
@@ -20,7 +19,7 @@ namespace KleeneStar.Portal.WebFragment
     /// </summary>
     [Section<SectionAppAvatarSecondary>]
     [Scope<IScopePortal>]
-    [Condition<ConditionLogin>]
+    [Condition<global::KleeneStar.Core.WebIdentity.SignedInCondition>]
     [Cache]
     public sealed class PortalLogoutLinkFragment : FragmentControlDropdownItemLinkLogout
     {
@@ -35,6 +34,13 @@ namespace KleeneStar.Portal.WebFragment
             : base(fragmentContext)
         {
             _componentHub = componentHub;
+
+            // the endpoint has to be handed over through RestEndpoint: the framework's
+            // Render(renderContext, visualTree, restEndpoint) overload drops its argument, and a
+            // link without an endpoint only redirects - the browser stays signed in. It is the
+            // core's endpoint, resolved against the core application, because a portal page
+            // resolving it against its own application gets nothing.
+            RestEndpoint = _ => KleeneStar.Core.CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Session>();
         }
 
         /// <summary>
@@ -45,9 +51,7 @@ namespace KleeneStar.Portal.WebFragment
         /// <returns>The rendered HTML node.</returns>
         public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
-            var logoutUri = _componentHub.SitemapManager.GetUri<KleeneStar.Core.WWW.Api._1_.Session>(renderContext?.PageContext.ApplicationContext);
-
-            return base.Render(renderContext, visualTree, logoutUri);
+            return base.Render(renderContext, visualTree, RestEndpoint?.Invoke(renderContext));
         }
     }
 }
