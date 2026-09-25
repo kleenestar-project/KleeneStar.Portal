@@ -1,4 +1,5 @@
 using KleeneStar.Core.WebAttribute;
+using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Portal.WebIcon;
 using KleeneStar.Portal.WebManager;
@@ -96,7 +97,7 @@ namespace KleeneStar.Portal.WWW.Workspaces._workspacekey_.Classes
             {
                 var capturedId = cls.Id;
                 var capturedName = cls.Name;
-                var capturedDescription = cls.Description ?? string.Empty;
+                var capturedDescription = ProseText.ToPlainText(cls.Description) ?? string.Empty;
 
                 table = table.AddRow
                 (

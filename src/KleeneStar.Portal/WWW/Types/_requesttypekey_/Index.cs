@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebControl;
 using KleeneStar.Portal.WebAttribute;
 using KleeneStar.Portal.WebDomain;
 using KleeneStar.Portal.WebIcon;
@@ -70,7 +71,7 @@ namespace KleeneStar.Portal.WWW.Types._requesttypekey_
 
             visualTree.Content.MainPanel.AddPrimary(new ControlText()
             {
-                Text = _ => requestType.Description ?? string.Empty,
+                Text = _ => ProseText.ToPlainText(requestType.Description) ?? string.Empty,
                 TextColor = _ => new PropertyColorText(TypeColorText.Secondary),
                 Margin = _ => new PropertySpacingMargin(PropertySpacing.Space.None, PropertySpacing.Space.None, PropertySpacing.Space.Three, PropertySpacing.Space.None)
             });
@@ -91,7 +92,7 @@ namespace KleeneStar.Portal.WWW.Types._requesttypekey_
             {
                 var capturedKey = template.Key;
                 var capturedTitle = template.Title;
-                var capturedDescription = template.Description ?? string.Empty;
+                var capturedDescription = ProseText.ToPlainText(template.Description) ?? string.Empty;
 
                 table = table.AddRow
                 (

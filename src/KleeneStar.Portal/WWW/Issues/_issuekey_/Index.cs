@@ -174,9 +174,12 @@ namespace KleeneStar.Portal.WWW.Issues._issuekey_
                 TextColor = _ => new PropertyColorText(TypeColorText.Secondary),
                 Margin = _ => new PropertySpacingMargin(PropertySpacing.Space.None, PropertySpacing.Space.None, PropertySpacing.Space.One, PropertySpacing.Space.None)
             });
-            visualTree.Content.MainPanel.AddPrimary(new ControlText()
+            // the description is written in the prose editor and stored as its document, so it
+            // is handed to the framework's reading view rather than printed as text
+            visualTree.Content.MainPanel.AddPrimary(new ControlContent()
             {
-                Text = _ => issue.Description ?? string.Empty,
+                Content = _ => issue.Description,
+                Format = _ => TypeFormatContent.RichText,
                 Margin = _ => new PropertySpacingMargin(PropertySpacing.Space.None, PropertySpacing.Space.None, PropertySpacing.Space.Three, PropertySpacing.Space.None)
             });
 

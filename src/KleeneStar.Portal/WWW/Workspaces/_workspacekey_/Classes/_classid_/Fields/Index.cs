@@ -1,4 +1,5 @@
 using KleeneStar.Core.WebAttribute;
+using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Portal.WebIcon;
 using KleeneStar.Portal.WebManager;
@@ -152,7 +153,7 @@ namespace KleeneStar.Portal.WWW.Workspaces._workspacekey_.Classes._classid_.Fiel
             {
                 var capturedId = field.Id;
                 var capturedName = field.Name;
-                var capturedDescription = field.Description ?? string.Empty;
+                var capturedDescription = ProseText.ToPlainText(field.Description) ?? string.Empty;
 
                 // row actions: edit (PUT), clone (POST), delete (DELETE)
                 var updateUri = PortalHub

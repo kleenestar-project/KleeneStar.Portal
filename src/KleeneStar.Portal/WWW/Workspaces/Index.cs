@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebControl;
 using KleeneStar.Portal.WebIcon;
 using KleeneStar.Portal.WebManager;
 using KleeneStar.Portal.WebScope;
@@ -85,7 +86,7 @@ namespace KleeneStar.Portal.WWW.Workspaces
             {
                 var capturedKey = workspace.Key;
                 var capturedName = workspace.Name;
-                var capturedDescription = workspace.Description ?? string.Empty;
+                var capturedDescription = ProseText.ToPlainText(workspace.Description) ?? string.Empty;
                 var classCount = _portalManager.GetClasses(workspace.Id).Count;
                 var capturedCount = classCount;
 

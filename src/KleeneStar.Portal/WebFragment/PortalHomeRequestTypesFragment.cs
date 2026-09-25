@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebControl;
 using KleeneStar.Portal.WebDomain;
 using KleeneStar.Portal.WebManager;
 using KleeneStar.Portal.WebParameter;
@@ -77,7 +78,7 @@ namespace KleeneStar.Portal.WebFragment
 
             card.Add(new ControlText()
             {
-                Text = _ => requestType.Description,
+                Text = _ => ProseText.ToPlainText(requestType.Description),
                 TextColor = _ => new PropertyColorText(TypeColorText.Secondary)
             });
             card.Add(new ControlText()

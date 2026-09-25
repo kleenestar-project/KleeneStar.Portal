@@ -1,4 +1,5 @@
 using KleeneStar.Core.WebAttribute;
+using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Portal.WebIcon;
 using KleeneStar.Portal.WebManager;
@@ -86,7 +87,7 @@ namespace KleeneStar.Portal.WWW.Workspaces._workspacekey_.Classes._classid_.Stat
             foreach (var status in statuses)
             {
                 var capturedName = status.Name;
-                var capturedDescription = status.Description ?? string.Empty;
+                var capturedDescription = ProseText.ToPlainText(status.Description) ?? string.Empty;
 
                 table = table.AddRow
                 (

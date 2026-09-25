@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebControl;
 using KleeneStar.Portal.WebAttribute;
 using KleeneStar.Portal.WebDomain;
 using KleeneStar.Portal.WebIcon;
@@ -95,11 +96,11 @@ namespace KleeneStar.Portal.WWW.Types._requesttypekey_.New
                     Text = _ => template.Title,
                     TextColor = _ => new PropertyColorText(TypeColorText.Secondary)
                 });
-                if (!string.IsNullOrWhiteSpace(template.Description))
+                if (!ProseText.IsEmpty(template.Description))
                 {
                     visualTree.Content.MainPanel.AddPrimary(new ControlText()
                     {
-                        Text = _ => template.Description,
+                        Text = _ => ProseText.ToPlainText(template.Description),
                         TextColor = _ => new PropertyColorText(TypeColorText.Secondary),
                         Margin = _ => new PropertySpacingMargin(PropertySpacing.Space.None, PropertySpacing.Space.None, PropertySpacing.Space.Three, PropertySpacing.Space.None)
                     });
