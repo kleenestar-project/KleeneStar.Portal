@@ -40,5 +40,13 @@ namespace KleeneStar.Portal
             // subscription is made here, once every manager of both applications exists
             PortalHub.PortalManager.Connect();
         }
+
+        /// <summary>
+        /// Called when the host shuts down. The application holds no resources of its own;
+        /// the database contexts are created and disposed per use.
+        /// </summary>
+        public void Dispose()
+        {
+        }
     }
 }
