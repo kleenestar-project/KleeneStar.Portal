@@ -8,7 +8,7 @@ Built on the **WebExpress-Framework**, it runs as a self-contained application a
 
 ## What It Powers
 
-**KleeneStar.Portal** is a deliberately reduced projection of **KleeneStar** for non-specialist audiences. Internal classes, fields, workflows, and dashboards are hidden; instead, the portal presents pre-curated **request types**, pre-defined **templates**, and a personalized list of **issues** that the user has created, has access to, or has been invited to.
+**KleeneStar.Portal** is a deliberately reduced projection of **KleeneStar** for non-specialist audiences. Internal classes, fields, workflows, and insights are hidden; instead, the portal presents pre-curated **request types**, pre-defined **templates**, and a personalized list of **issues** that the user has created, has access to, or has been invited to.
 
 Every interaction the portal offers maps to operations defined in **KleeneStar.Core**, but is constrained by tenant scope, identity context, and the active permissions profile. The `PortalManager` orchestrates these constraints and exposes them to the portal pages and to integrations as a controlled REST API.
 

@@ -30,7 +30,7 @@ namespace KleeneStar.Portal.Test
             ("_workflowManager",  typeof(WorkflowManager)),
             ("_statusManager",    typeof(StatusManager)),
             ("_objectManager",    typeof(ObjectManager)),
-            ("_dashboardManager", typeof(DashboardManager)),
+            ("_insightManager", typeof(InsightManager)),
             ("_kanbanBoardManager", typeof(KanbanBoardManager)),
             ("_kindDashboardManager", typeof(KindDashboardManager)),
             ("_tenantManager",    typeof(TenantManager)),
