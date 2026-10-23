@@ -17,6 +17,7 @@ namespace KleeneStar.Portal.WebFragment
     /// </summary>
     [Section<SectionAppNavigationPrimary>]
     [Scope<IScopePortal>]
+    [Condition<global::KleeneStar.Portal.WebPermission.OperatorCondition>]
     [Cache]
     public sealed class PortalAdminNavFragment : FragmentControlDropdownItemLink
     {

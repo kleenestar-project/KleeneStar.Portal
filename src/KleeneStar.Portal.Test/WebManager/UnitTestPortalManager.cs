@@ -39,12 +39,26 @@ namespace KleeneStar.Portal.Test.WebManager
         private static readonly Guid TenantlessIdentityId = Guid.Parse("0D0D0D0D-0D0D-4D0D-8D0D-0D0D0D0D0D0D");
         private static readonly Guid GlobexIncidentClassId = Guid.Parse("CCCCCCCC-CCCC-4CCC-8CCC-CCCCCCCCCCCC");
 
+        // the Acme member the tests act as - the signed-in requester of SD-1
+        private static readonly Guid ActingIdentityId = Guid.Parse("77087646-B13A-44B1-9BAC-6E66443CEDFD");
+
+        /// <summary>
+        /// Acts as the supplied identity until the returned scope is disposed - the stand-in for
+        /// a signed-in caller, since the manager answers for the identity acting on the call chain.
+        /// </summary>
+        /// <param name="identityId">The identity to act as.</param>
+        /// <returns>The scope.</returns>
+        private static IDisposable ActAs(Guid identityId)
+        {
+            return CoreHub.SessionManager.BeginIdentity(identityId);
+        }
+
         /// <summary>
         /// Seeds the in-memory database with the full portal world: a workspace, a
         /// portal-visible Incident class (with workflow/priority fields, statuses across
         /// all four categories, P1–P4 priorities, and a portal-template form), an
-        /// internal class that must never surface, the acting admin identity (the
-        /// portal's fallback identity), a second tenant member, and two issues.
+        /// internal class that must never surface, the identity the tests act as (an Acme
+        /// member), a second tenant member, and two issues.
         /// </summary>
         /// <param name="connectionString">The per-test in-memory database name.</param>
         /// <returns>The portal manager under test.</returns>
@@ -198,7 +212,7 @@ namespace KleeneStar.Portal.Test.WebManager
                 Updated = DateTime.UtcNow
             });
 
-            db.Identities.Add(new Identity(PortalManager.FallbackIdentityId)
+            db.Identities.Add(new Identity(ActingIdentityId)
             {
                 Name = "Admin User",
                 Email = "admin@kleenestar.org",
@@ -239,7 +253,7 @@ namespace KleeneStar.Portal.Test.WebManager
                 Description = "No external mail since this morning.",
                 WorkspaceId = WorkspaceId,
                 ClassId = IncidentClassId,
-                CreatorId = PortalManager.FallbackIdentityId,
+                CreatorId = ActingIdentityId,
                 Created = DateTime.UtcNow.AddDays(-2),
                 Updated = DateTime.UtcNow.AddHours(-2)
             });
@@ -260,7 +274,7 @@ namespace KleeneStar.Portal.Test.WebManager
                 Summary = "Internal problem record",
                 WorkspaceId = WorkspaceId,
                 ClassId = InternalClassId,
-                CreatorId = PortalManager.FallbackIdentityId,
+                CreatorId = ActingIdentityId,
                 Created = DateTime.UtcNow,
                 Updated = DateTime.UtcNow
             });
@@ -323,11 +337,12 @@ namespace KleeneStar.Portal.Test.WebManager
         public void GetRequestTypes_ReturnsOnlyPortalVisibleClasses()
         {
             var manager = Seed(nameof(GetRequestTypes_ReturnsOnlyPortalVisibleClasses));
+            using var acting = ActAs(TenantlessIdentityId);
 
             var requestTypes = manager.GetRequestTypes();
 
             // the seed provisions two portal-visible Incident classes (Acme + Globex)
-            // sharing the same name; both are exposed as request types.
+            // sharing the same name; an operator-side account is offered both.
             Assert.Equal(2, requestTypes.Count);
             var acme = requestTypes.Single(rt => rt.Description == "Incident management.");
             Assert.Equal("sd-incident", acme.Key);
@@ -345,6 +360,7 @@ namespace KleeneStar.Portal.Test.WebManager
         public void GetRequestType_ByKey_IsCaseInsensitive()
         {
             var manager = Seed(nameof(GetRequestType_ByKey_IsCaseInsensitive));
+            using var acting = ActAs(ActingIdentityId);
 
             Assert.NotNull(manager.GetRequestType("SD-Incident"));
             Assert.NotNull(manager.GetRequestType("SD-INCIDENT"));
@@ -360,6 +376,7 @@ namespace KleeneStar.Portal.Test.WebManager
         public void GetIssues_OrganizationScope_ExcludesInternalClasses()
         {
             var manager = Seed(nameof(GetIssues_OrganizationScope_ExcludesInternalClasses));
+            using var acting = ActAs(ActingIdentityId);
 
             // the seeded admin is an Acme member; both SD-1 and SD-2 live in the
             // Acme workspace, so the Acme view sees both. SD-3 is on the internal
@@ -380,8 +397,9 @@ namespace KleeneStar.Portal.Test.WebManager
         public void GetIssues_OrganizationScope_IsTenantIsolated()
         {
             var manager = Seed(nameof(GetIssues_OrganizationScope_IsTenantIsolated));
+            using var acting = ActAs(ActingIdentityId);
 
-            var acmeView = manager.GetIssues(IssueScope.Organization, PortalManager.FallbackIdentityId);
+            var acmeView = manager.GetIssues(IssueScope.Organization, ActingIdentityId);
             var globexView = manager.GetIssues(IssueScope.Organization, GlobexMemberIdentityId);
 
             // the seeded admin (Acme) sees every issue of the Acme workspace
@@ -402,6 +420,7 @@ namespace KleeneStar.Portal.Test.WebManager
         public void GetIssues_OrganizationScope_ExcludesTenantlessIdentities()
         {
             var manager = Seed(nameof(GetIssues_OrganizationScope_ExcludesTenantlessIdentities));
+            using var acting = ActAs(ActingIdentityId);
 
             var org = manager.GetIssues(IssueScope.Organization, TenantlessIdentityId);
 
@@ -416,16 +435,145 @@ namespace KleeneStar.Portal.Test.WebManager
         public void GetIssues_MineScope_FiltersByParticipation()
         {
             var manager = Seed(nameof(GetIssues_MineScope_FiltersByParticipation));
+            using var acting = ActAs(ActingIdentityId);
 
             var mine = manager.GetIssues(IssueScope.Mine);
             var issue = Assert.Single(mine);
             Assert.Equal("SD-1", issue.Key);
 
-            // sharing the foreign issue with the current identity pulls it into scope
-            manager.ShareIssue("SD-2", [PortalManager.FallbackIdentityId.ToString()]);
+            // the requester of the foreign issue sharing it with the current identity pulls it
+            // into scope
+            using (ActAs(MemberIdentityId))
+            {
+                manager.ShareIssue("SD-2", [ActingIdentityId.ToString()]);
+            }
 
             mine = manager.GetIssues(IssueScope.Mine);
             Assert.Equal(2, mine.Count);
+        }
+
+        /// <summary>
+        /// Sharing widens the audience of somebody's request, so a member of the organization
+        /// who is neither its requester nor a participant may not share it - not even with
+        /// themselves.
+        /// </summary>
+        [Fact]
+        public void ShareIssue_ByANonParticipant_IsRefused()
+        {
+            var manager = Seed(nameof(ShareIssue_ByANonParticipant_IsRefused));
+            using var acting = ActAs(ActingIdentityId);
+
+            Assert.Throws<PortalForbiddenException>(() => manager.ShareIssue("SD-2", [ActingIdentityId.ToString()]));
+        }
+
+        /// <summary>
+        /// Nobody signed in sees no issue, opens none by key and submits nothing - there is no
+        /// stand-in identity any more.
+        /// </summary>
+        [Fact]
+        public void AnonymousCaller_SeesAndSubmitsNothing()
+        {
+            var manager = Seed(nameof(AnonymousCaller_SeesAndSubmitsNothing));
+            using var acting = ActAs(Guid.Empty);
+
+            Assert.Empty(manager.GetIssues(IssueScope.Mine));
+            Assert.Empty(manager.GetIssues(IssueScope.Organization));
+            Assert.Empty(manager.GetRequestTypes());
+            Assert.Null(manager.GetIssue("SD-1"));
+            Assert.Null(manager.CurrentUser);
+            Assert.Throws<PortalForbiddenException>(() => manager.CreateIssue("sd-incident", null, "anonymous", null, null));
+        }
+
+        /// <summary>
+        /// The organization scope is the issues the members of the caller's tenant filed: a
+        /// customer of another tenant does not see them, not even by key.
+        /// </summary>
+        [Fact]
+        public void GetIssue_OfAnotherTenant_IsNotFound()
+        {
+            var manager = Seed(nameof(GetIssue_OfAnotherTenant_IsNotFound));
+            using var acting = ActAs(GlobexMemberIdentityId);
+
+            Assert.Null(manager.GetIssue("SD-1"));
+            Assert.DoesNotContain(manager.GetIssues(IssueScope.Organization), i => i.Key.StartsWith("SD-", StringComparison.Ordinal));
+        }
+
+        /// <summary>
+        /// A request restricted to its participants leaves the organization scope: a colleague
+        /// of the requester no longer sees it, the requester and the identities it is shared
+        /// with still do, and opening it again brings it back. Only the requester changes it.
+        /// </summary>
+        [Fact]
+        public void SetRestricted_KeepsTheIssueToItsParticipants()
+        {
+            var manager = Seed(nameof(SetRestricted_KeepsTheIssueToItsParticipants));
+            using var acting = ActAs(MemberIdentityId);
+
+            var restricted = manager.SetRestricted("SD-2", true);
+
+            Assert.True(restricted!.Restricted);
+
+            using (ActAs(ActingIdentityId))
+            {
+                Assert.Null(manager.GetIssue("SD-2"));
+                Assert.DoesNotContain(manager.GetIssues(IssueScope.Organization), i => i.Key == "SD-2");
+            }
+
+            manager.ShareIssue("SD-2", [ActingIdentityId.ToString()]);
+
+            using (ActAs(ActingIdentityId))
+            {
+                Assert.NotNull(manager.GetIssue("SD-2"));
+
+                // a participant sees the issue but does not decide who else does
+                Assert.Throws<PortalForbiddenException>(() => manager.SetRestricted("SD-2", false));
+            }
+
+            manager.SetRestricted("SD-2", false);
+            manager.UnshareIssue("SD-2", ActingIdentityId.ToString());
+
+            using (ActAs(ActingIdentityId))
+            {
+                Assert.Contains(manager.GetIssues(IssueScope.Organization), i => i.Key == "SD-2");
+            }
+        }
+
+        /// <summary>
+        /// A request can be restricted when it is submitted, and the restriction is recorded in
+        /// the object's history like any other change of who may see it.
+        /// </summary>
+        [Fact]
+        public void CreateIssue_Restricted_IsHiddenFromTheOrganization()
+        {
+            var manager = Seed(nameof(CreateIssue_Restricted_IsHiddenFromTheOrganization));
+            using var acting = ActAs(MemberIdentityId);
+
+            var created = manager.CreateIssue("sd-incident", null, "Question about my contract", null, null, restricted: true);
+
+            Assert.True(created.Restricted);
+            Assert.Equal("Anna Becker", created.Requester?.Name);
+
+            using (ActAs(ActingIdentityId))
+            {
+                Assert.Null(manager.GetIssue(created.Key));
+            }
+        }
+
+        /// <summary>
+        /// Accepting or rejecting a resolution is the requester's decision; a colleague who
+        /// merely sees the issue is refused.
+        /// </summary>
+        [Fact]
+        public void ResolutionDecision_ByANonRequester_IsRefused()
+        {
+            var connectionString = nameof(ResolutionDecision_ByANonRequester_IsRefused);
+            var manager = Seed(connectionString);
+            using var acting = ActAs(ActingIdentityId);
+
+            StampStatus(connectionString, ForeignObjectId, "Resolved");
+
+            Assert.Throws<PortalForbiddenException>(() => manager.AcceptResolution("SD-2"));
+            Assert.Throws<PortalForbiddenException>(() => manager.RejectResolution("SD-2", "not mine"));
         }
 
         /// <summary>
@@ -436,6 +584,7 @@ namespace KleeneStar.Portal.Test.WebManager
         public void GetIssue_ProjectsHeadStateAndPriority()
         {
             var manager = Seed(nameof(GetIssue_ProjectsHeadStateAndPriority));
+            using var acting = ActAs(ActingIdentityId);
 
             var issue = manager.GetIssue("SD-1");
 
@@ -456,6 +605,7 @@ namespace KleeneStar.Portal.Test.WebManager
         public void GetIssue_InternalClass_ReturnsNull()
         {
             var manager = Seed(nameof(GetIssue_InternalClass_ReturnsNull));
+            using var acting = ActAs(ActingIdentityId);
 
             Assert.Null(manager.GetIssue("SD-3"));
         }
@@ -499,6 +649,7 @@ namespace KleeneStar.Portal.Test.WebManager
         {
             var connectionString = nameof(GetIssue_ProjectsRelationsFromEitherSide);
             var manager = Seed(connectionString);
+            using var acting = ActAs(ActingIdentityId);
             SeedRelations(connectionString, new ObjectRelation { SourceObjectId = MineObjectId, TargetObjectId = ForeignObjectId });
 
             var source = Assert.Single(manager.GetIssue("SD-1").Relations);
@@ -524,6 +675,7 @@ namespace KleeneStar.Portal.Test.WebManager
         {
             var connectionString = nameof(GetIssue_HidesInternalExternalAndObsoleteRelations);
             var manager = Seed(connectionString);
+            using var acting = ActAs(ActingIdentityId);
             SeedRelations
             (
                 connectionString,
@@ -552,6 +704,7 @@ namespace KleeneStar.Portal.Test.WebManager
         {
             var connectionString = nameof(GetIssue_MapsStatusCategoryToPortalState) + statusName.Replace(" ", string.Empty);
             var manager = Seed(connectionString);
+            using var acting = ActAs(ActingIdentityId);
 
             StampStatus(connectionString, MineObjectId, statusName);
 
@@ -567,6 +720,7 @@ namespace KleeneStar.Portal.Test.WebManager
         public void CreateIssue_PersistsStampsAndNotifies()
         {
             var manager = Seed(nameof(CreateIssue_PersistsStampsAndNotifies));
+            using var acting = ActAs(ActingIdentityId);
 
             IIssue? created = null;
             manager.IssueCreated += (_, issue) => created = issue;
@@ -596,6 +750,7 @@ namespace KleeneStar.Portal.Test.WebManager
         public void CreateIssue_ValidatesArguments()
         {
             var manager = Seed(nameof(CreateIssue_ValidatesArguments));
+            using var acting = ActAs(ActingIdentityId);
 
             Assert.ThrowsAny<ArgumentException>(() => manager.CreateIssue(null!, null, "title", null, null));
             Assert.ThrowsAny<ArgumentException>(() => manager.CreateIssue("sd-incident", null, " ", null, null));
@@ -610,6 +765,7 @@ namespace KleeneStar.Portal.Test.WebManager
         public void AddComment_AppendsToTimeline()
         {
             var manager = Seed(nameof(AddComment_AppendsToTimeline));
+            using var acting = ActAs(ActingIdentityId);
 
             IssueComment? commented = null;
             var updated = 0;
@@ -637,6 +793,13 @@ namespace KleeneStar.Portal.Test.WebManager
         {
             var connectionString = nameof(AddComment_PersistsVisibility);
             var manager = Seed(connectionString);
+            using var acting = ActAs(TenantlessIdentityId);
+
+            // a customer cannot address the service team's notes
+            using (ActAs(ActingIdentityId))
+            {
+                Assert.Throws<PortalForbiddenException>(() => manager.AddComment("SD-1", "Internal?", "internal-team"));
+            }
 
             manager.AddComment("SD-1", "Checked the mailbox quota.", "internal-team");
 
@@ -658,6 +821,7 @@ namespace KleeneStar.Portal.Test.WebManager
         {
             var connectionString = nameof(AddComment_UnknownVisibilityReadsAsPublic);
             var manager = Seed(connectionString);
+            using var acting = ActAs(ActingIdentityId);
 
             manager.AddComment("SD-1", "Any update?", "internal_team");
 
@@ -675,6 +839,7 @@ namespace KleeneStar.Portal.Test.WebManager
         {
             var connectionString = nameof(GetIssue_FiltersInternalCommentsForUninvolvedViewer);
             var manager = Seed(connectionString);
+            using var acting = ActAs(ActingIdentityId);
 
             // SD-2 was raised by the second tenant member and carries no assignee, so the
             // acting portal identity is none of the three audiences of an internal note.
@@ -688,18 +853,35 @@ namespace KleeneStar.Portal.Test.WebManager
         }
 
         /// <summary>
-        /// The requester of an issue does see its internal-team comments: the concept
-        /// limits them to the assigned service group <em>plus the requester</em>.
+        /// The requester of an issue does not see its internal-team comments: an internal note
+        /// is the service team's, and a note the customer can read is a public comment.
         /// </summary>
         [Fact]
-        public void GetIssue_KeepsInternalCommentsForRequester()
+        public void GetIssue_HidesInternalCommentsFromTheRequester()
         {
-            var connectionString = nameof(GetIssue_KeepsInternalCommentsForRequester);
+            var connectionString = nameof(GetIssue_HidesInternalCommentsFromTheRequester);
             var manager = Seed(connectionString);
+            using var acting = ActAs(ActingIdentityId);
 
-            // SD-1 was raised by the acting portal identity, so it is that viewer's own
-            // issue and the internal note reaches them.
-            AddComment(connectionString, MineObjectId, MemberIdentityId, "Service team only.", CommentVisibility.InternalTeam);
+            AddComment(connectionString, MineObjectId, TenantlessIdentityId, "Service team only.", CommentVisibility.InternalTeam);
+
+            var issue = manager.GetIssue("SD-1");
+
+            Assert.Empty(issue!.Comments);
+        }
+
+        /// <summary>
+        /// The service team - an operator-side account the operator side lets read the object -
+        /// does see the internal notes when it opens the issue in the portal.
+        /// </summary>
+        [Fact]
+        public void GetIssue_ShowsInternalCommentsToTheServiceTeam()
+        {
+            var connectionString = nameof(GetIssue_ShowsInternalCommentsToTheServiceTeam);
+            var manager = Seed(connectionString);
+            using var acting = ActAs(TenantlessIdentityId);
+
+            AddComment(connectionString, MineObjectId, TenantlessIdentityId, "Service team only.", CommentVisibility.InternalTeam);
 
             var issue = manager.GetIssue("SD-1");
 
@@ -744,6 +926,7 @@ namespace KleeneStar.Portal.Test.WebManager
         public void ShareIssue_IsIdempotentAndRaisesOnce()
         {
             var manager = Seed(nameof(ShareIssue_IsIdempotentAndRaisesOnce));
+            using var acting = ActAs(ActingIdentityId);
 
             var shared = 0;
             manager.IssueShared += (_, _) => shared++;
@@ -767,6 +950,7 @@ namespace KleeneStar.Portal.Test.WebManager
         public void UnshareIssue_RevokesAndRaises()
         {
             var manager = Seed(nameof(UnshareIssue_RevokesAndRaises));
+            using var acting = ActAs(ActingIdentityId);
 
             var unshared = 0;
             manager.IssueUnshared += (_, _) => unshared++;
@@ -791,6 +975,7 @@ namespace KleeneStar.Portal.Test.WebManager
         public void Watch_Unwatch_RoundTrip()
         {
             var manager = Seed(nameof(Watch_Unwatch_RoundTrip));
+            using var acting = ActAs(ActingIdentityId);
 
             var watchedEvents = 0;
             var unwatchedEvents = 0;
@@ -818,6 +1003,7 @@ namespace KleeneStar.Portal.Test.WebManager
         {
             var connectionString = nameof(AcceptResolution_ClosesResolvedIssue);
             var manager = Seed(connectionString);
+            using var acting = ActAs(ActingIdentityId);
 
             var accepted = 0;
             var closed = 0;
@@ -855,6 +1041,7 @@ namespace KleeneStar.Portal.Test.WebManager
         {
             var connectionString = nameof(RejectResolution_ReturnsIssueToInProgress);
             var manager = Seed(connectionString);
+            using var acting = ActAs(ActingIdentityId);
 
             Assert.ThrowsAny<ArgumentException>(() => manager.RejectResolution("SD-1", " "));
 
@@ -883,6 +1070,7 @@ namespace KleeneStar.Portal.Test.WebManager
         {
             var connectionString = nameof(Unwatch_WithoutActiveSubscription_ThrowsConflict);
             var manager = Seed(connectionString);
+            using var acting = ActAs(ActingIdentityId);
 
             Assert.Throws<PortalConflictException>(() => manager.Unwatch("SD-1"));
         }
@@ -897,6 +1085,7 @@ namespace KleeneStar.Portal.Test.WebManager
         {
             var connectionString = nameof(NotifyResolutionProposed_FiresOnlyForResolvedIssues);
             var manager = Seed(connectionString);
+            using var acting = ActAs(ActingIdentityId);
 
             var raised = 0;
             IIssue? raisedIssue = null;
@@ -925,6 +1114,7 @@ namespace KleeneStar.Portal.Test.WebManager
         public void CurrentUser_And_OrganizationMembers_ResolveFromIdentityModel()
         {
             var manager = Seed(nameof(CurrentUser_And_OrganizationMembers_ResolveFromIdentityModel));
+            using var acting = ActAs(ActingIdentityId);
 
             var current = manager.CurrentUser;
             Assert.NotNull(current);
@@ -947,6 +1137,7 @@ namespace KleeneStar.Portal.Test.WebManager
         public void GetOrganizationMembers_IsBoundedByTheCallersTenant()
         {
             var manager = Seed(nameof(GetOrganizationMembers_IsBoundedByTheCallersTenant));
+            using var acting = ActAs(ActingIdentityId);
 
             var globex = manager.GetOrganizationMembers(GlobexMemberIdentityId);
             Assert.Single(globex);
@@ -969,6 +1160,7 @@ namespace KleeneStar.Portal.Test.WebManager
         public void GetOrganizationMembers_LeavesOutDisabledAccounts()
         {
             var manager = Seed(nameof(GetOrganizationMembers_LeavesOutDisabledAccounts));
+            using var acting = ActAs(ActingIdentityId);
 
             using (var db = PortalHubFixture.CreateDbContext(nameof(GetOrganizationMembers_LeavesOutDisabledAccounts)))
             {
@@ -991,6 +1183,7 @@ namespace KleeneStar.Portal.Test.WebManager
         public void ShareIssue_RefusesIdentitiesOutsideTheOrganization()
         {
             var manager = Seed(nameof(ShareIssue_RefusesIdentitiesOutsideTheOrganization));
+            using var acting = ActAs(ActingIdentityId);
 
             var raised = 0;
             manager.IssueShared += (_, _) => raised++;
@@ -1017,6 +1210,7 @@ namespace KleeneStar.Portal.Test.WebManager
         public void RequestTypeKeys_AreUniqueAcrossWorkspaces()
         {
             var manager = Seed(nameof(RequestTypeKeys_AreUniqueAcrossWorkspaces));
+            using var acting = ActAs(TenantlessIdentityId);
 
             var keys = manager.GetRequestTypes().Select(rt => rt.Key).ToList();
 
@@ -1039,14 +1233,22 @@ namespace KleeneStar.Portal.Test.WebManager
         public void CreateIssue_AddressesTheRequestTypeByWorkspace()
         {
             var manager = Seed(nameof(CreateIssue_AddressesTheRequestTypeByWorkspace));
+            using var acting = ActAs(GlobexMemberIdentityId);
 
             var result = manager.CreateIssue("SDG-Incident", null, "Globex mail down", null, null);
 
             Assert.NotNull(result);
             Assert.Equal("SDG-2", result.Key);
             Assert.Equal("Incident management (Globex).", result.RequestType?.Description);
+            Assert.Equal("Gina Globex", result.Requester?.Name);
 
             Assert.Throws<InvalidOperationException>(() => manager.CreateIssue("incident", null, "no workspace named", null, null));
+
+            // a customer cannot file into a workspace that does not serve their tenant
+            using (ActAs(ActingIdentityId))
+            {
+                Assert.Throws<InvalidOperationException>(() => manager.CreateIssue("SDG-Incident", null, "not my service desk", null, null));
+            }
         }
 
         /// <summary>
@@ -1107,6 +1309,7 @@ namespace KleeneStar.Portal.Test.WebManager
         public void Connect_RaisesResolutionProposedFromAWorkflowMove()
         {
             var manager = Seed(nameof(Connect_RaisesResolutionProposedFromAWorkflowMove));
+            using var acting = ActAs(ActingIdentityId);
             var statuses = SeedWorkflow(nameof(Connect_RaisesResolutionProposedFromAWorkflowMove));
 
             var proposed = new List<IIssue>();
@@ -1115,12 +1318,12 @@ namespace KleeneStar.Portal.Test.WebManager
             manager.Connect();
 
             // SD-2 is New: starting work is not a proposal
-            var started = CoreHub.WorkflowManager.ExecuteTransition(ForeignObjectId, WorkflowFieldId, statuses["In Progress"], PortalManager.FallbackIdentityId);
+            var started = CoreHub.WorkflowManager.ExecuteTransition(ForeignObjectId, WorkflowFieldId, statuses["In Progress"], ActingIdentityId);
             Assert.True(started.Succeeded);
             Assert.Empty(proposed);
 
             // SD-1 is In Progress: resolving it is
-            var resolved = CoreHub.WorkflowManager.ExecuteTransition(MineObjectId, WorkflowFieldId, statuses["Resolved"], PortalManager.FallbackIdentityId);
+            var resolved = CoreHub.WorkflowManager.ExecuteTransition(MineObjectId, WorkflowFieldId, statuses["Resolved"], ActingIdentityId);
             Assert.True(resolved.Succeeded);
 
             var issue = Assert.Single(proposed);
@@ -1128,7 +1331,7 @@ namespace KleeneStar.Portal.Test.WebManager
             Assert.Equal(PortalIssueState.Resolved, issue.PortalState);
 
             // closing is terminal, not a proposal
-            var closed = CoreHub.WorkflowManager.ExecuteTransition(MineObjectId, WorkflowFieldId, statuses["Closed"], PortalManager.FallbackIdentityId);
+            var closed = CoreHub.WorkflowManager.ExecuteTransition(MineObjectId, WorkflowFieldId, statuses["Closed"], ActingIdentityId);
             Assert.True(closed.Succeeded);
             Assert.Single(proposed);
         }
@@ -1141,6 +1344,7 @@ namespace KleeneStar.Portal.Test.WebManager
         public void Connect_IsIdempotentAndIgnoresRefusedMoves()
         {
             var manager = Seed(nameof(Connect_IsIdempotentAndIgnoresRefusedMoves));
+            using var acting = ActAs(ActingIdentityId);
             var statuses = SeedWorkflow(nameof(Connect_IsIdempotentAndIgnoresRefusedMoves));
 
             var proposed = 0;
@@ -1150,11 +1354,11 @@ namespace KleeneStar.Portal.Test.WebManager
             manager.Connect();
 
             // SD-2 is New and the workflow declares no move from New to Resolved
-            var refused = CoreHub.WorkflowManager.ExecuteTransition(ForeignObjectId, WorkflowFieldId, statuses["Resolved"], PortalManager.FallbackIdentityId);
+            var refused = CoreHub.WorkflowManager.ExecuteTransition(ForeignObjectId, WorkflowFieldId, statuses["Resolved"], ActingIdentityId);
             Assert.False(refused.Succeeded);
             Assert.Equal(0, proposed);
 
-            CoreHub.WorkflowManager.ExecuteTransition(MineObjectId, WorkflowFieldId, statuses["Resolved"], PortalManager.FallbackIdentityId);
+            CoreHub.WorkflowManager.ExecuteTransition(MineObjectId, WorkflowFieldId, statuses["Resolved"], ActingIdentityId);
             Assert.Equal(1, proposed);
         }
 
@@ -1167,8 +1371,9 @@ namespace KleeneStar.Portal.Test.WebManager
         public void GetWorkspaces_RespectsTenantScope()
         {
             var manager = Seed(nameof(GetWorkspaces_RespectsTenantScope));
+            using var acting = ActAs(ActingIdentityId);
 
-            var acmeView = manager.GetWorkspaces(PortalManager.FallbackIdentityId);
+            var acmeView = manager.GetWorkspaces(ActingIdentityId);
             var globexView = manager.GetWorkspaces(GlobexMemberIdentityId);
             var operatorView = manager.GetWorkspaces(TenantlessIdentityId);
 
@@ -1190,6 +1395,7 @@ namespace KleeneStar.Portal.Test.WebManager
         public void GetClass_AndTogglePortalVisible_RoundTrip()
         {
             var manager = Seed(nameof(GetClass_AndTogglePortalVisible_RoundTrip));
+            using var acting = ActAs(ActingIdentityId);
 
             var cls = manager.GetClass(IncidentClassId);
             Assert.NotNull(cls);
@@ -1212,6 +1418,7 @@ namespace KleeneStar.Portal.Test.WebManager
         public void Field_AddListUpdateCloneDelete_RoundTrip()
         {
             var manager = Seed(nameof(Field_AddListUpdateCloneDelete_RoundTrip));
+            using var acting = ActAs(ActingIdentityId);
 
             var initial = manager.GetFields(IncidentClassId);
             // the seed provisions two fields (Status, Priority)
@@ -1251,6 +1458,7 @@ namespace KleeneStar.Portal.Test.WebManager
         public void AddField_RejectsReservedNames()
         {
             var manager = Seed(nameof(AddField_RejectsReservedNames));
+            using var acting = ActAs(ActingIdentityId);
 
             Assert.Throws<InvalidOperationException>(() =>
                 manager.AddField(IncidentClassId, "admin", "system reserved", FieldType.Text, FieldCardinality.Single, false, false));
@@ -1263,6 +1471,7 @@ namespace KleeneStar.Portal.Test.WebManager
         public void TogglePortalTemplate_RoundTrips()
         {
             var manager = Seed(nameof(TogglePortalTemplate_RoundTrips));
+            using var acting = ActAs(ActingIdentityId);
 
             // the seed provisions two forms (Self-Service Form, Resolver Form);
             // pick the first one and round-trip the toggle.

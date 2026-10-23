@@ -14,7 +14,6 @@ namespace KleeneStar.Portal.WWW.Api._1_.Classes._classid_.Forms._formid_
     /// <see cref="FormIdSegmentAttribute"/>.
     /// </summary>
     [Title("kleenestar.portal:api.admin.form.portaltemplate.title")]
-    [FormIdSegment]
     [Cache]
     public sealed class PortalTemplate : IRestApi
     {
@@ -39,6 +38,11 @@ namespace KleeneStar.Portal.WWW.Api._1_.Classes._classid_.Forms._formid_
             if (formIdParameter is null || !Guid.TryParse(formIdParameter.Value, out var formId))
             {
                 return PortalAdminApi.BadRequest("Invalid form id.");
+            }
+
+            if (!PortalAdminApi.MayAdministerForm(formId, request))
+            {
+                return PortalAdminApi.Forbidden();
             }
 
             var form = _portalManager.TogglePortalTemplate(formId);

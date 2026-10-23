@@ -39,9 +39,12 @@ namespace KleeneStar.Portal.WWW.Api._1_.Issues._issuekey_
         [Method(RequestMethod.POST)]
         public IResponse Create(IRequest request)
         {
-            var issue = _portalManager.Watch(PortalApi.GetIssueKey(request));
+            return PortalApi.RunWithConflictMapping(() =>
+            {
+                var issue = _portalManager.Watch(PortalApi.GetIssueKey(request));
 
-            return issue is null ? PortalApi.NotFound() : PortalApi.NoContent();
+                return issue is null ? PortalApi.NotFound() : PortalApi.NoContent();
+            });
         }
 
         /// <summary>

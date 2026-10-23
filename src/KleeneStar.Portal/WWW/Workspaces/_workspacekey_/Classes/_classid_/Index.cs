@@ -69,6 +69,8 @@ namespace KleeneStar.Portal.WWW.Workspaces._workspacekey_.Classes._classid_
         /// <param name="visualTree">The visual tree of the web application.</param>
         public void Process(IRenderContext renderContext, VisualTreeWebApp visualTree)
         {
+            global::KleeneStar.Portal.WebPermission.PortalAdminAuthorization.Demand(renderContext.Request);
+
             var classIdParameter = renderContext.Request.GetParameter<ClassIdParameter>();
             var cls = _portalManager.GetClass(classIdParameter is null
                 ? Guid.Empty

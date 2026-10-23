@@ -62,14 +62,17 @@ namespace KleeneStar.Portal.WWW.Api._1_.Issues._issuekey_
                 return PortalApi.Error($"'visibility' must be '{CommentVisibilityExtensions.PublicToken}' or '{CommentVisibilityExtensions.InternalTeamToken}'.");
             }
 
-            var issue = _portalManager.AddComment(
-                PortalApi.GetIssueKey(request),
-                payload.Text,
-                payload.Visibility ?? CommentVisibilityExtensions.PublicToken);
+            return PortalApi.RunWithConflictMapping(() =>
+            {
+                var issue = _portalManager.AddComment(
+                    PortalApi.GetIssueKey(request),
+                    payload.Text,
+                    payload.Visibility ?? CommentVisibilityExtensions.PublicToken);
 
-            return issue is null
-                ? PortalApi.NotFound()
-                : PortalApi.Created(PortalApi.ToDto(issue, includeTimeline: true));
+                return issue is null
+                    ? PortalApi.NotFound()
+                    : PortalApi.Created(PortalApi.ToDto(issue, includeTimeline: true));
+            });
         }
 
         /// <summary>

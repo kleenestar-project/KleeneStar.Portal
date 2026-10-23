@@ -21,7 +21,6 @@ namespace KleeneStar.Portal.WWW.Types._requesttypekey_.New
     /// Mirrors the "Create Issue (Modal)" mockup in <c>kleenestar.portal.md</c>.
     /// </summary>
     [WebIcon<RequestTypeIcon>]
-    [RequestTypeKeySegment]
     [Scope<IScopePortal>]
     public sealed class Index : IPage<VisualTreeWebApp>, IScopePortal
     {
@@ -42,6 +41,15 @@ namespace KleeneStar.Portal.WWW.Types._requesttypekey_.New
 
         /// <summary>Resource key for the request-type unavailable message.</summary>
         public const string NotAvailableResource = "kleenestar.portal:create.unavailable";
+
+        /// <summary>Resource key for the audience input label.</summary>
+        public const string AudienceLabelResource = "kleenestar.portal:create.audience.label";
+
+        /// <summary>Resource key for the audience of the whole organization.</summary>
+        public const string AudienceOrganizationResource = "kleenestar.portal:create.audience.organization";
+
+        /// <summary>Resource key for the audience of the participants only.</summary>
+        public const string AudienceParticipantsResource = "kleenestar.portal:create.audience.participants";
 
         /// <summary>Resource key for the priority label pattern (P1..P4); takes the level.</summary>
         public const string PriorityPrefixResource = "kleenestar.portal:create.priority";
@@ -142,6 +150,34 @@ namespace KleeneStar.Portal.WWW.Types._requesttypekey_.New
                 new ControlFormItemInputComboItem() { Value = _ => "P4", Text = _ => Priority(4) }
             );
             form.Add(urgency);
+
+            // a request about a person - a dismissal, a complaint, a salary question - must not
+            // be shown to the whole organization; the requester decides when submitting and
+            // can change it later on the visibility page
+            var audience = new ControlFormItemInputCombo("audience")
+            {
+                Label = _ => AudienceLabelResource
+            };
+
+            audience.Add
+            (
+                new ControlFormItemInputComboItem() { Value = _ => "organization", Text = _ => I18N.Translate(renderContext, AudienceOrganizationResource) },
+                new ControlFormItemInputComboItem() { Value = _ => "participants", Text = _ => I18N.Translate(renderContext, AudienceParticipantsResource) }
+            );
+            form.Add(audience);
+
+            // the endpoint is the request type's own address only by convention of this page;
+            // the payload has to say which request type and template it is for
+            form.Add(new PresetHiddenInput("portal-create-request-type")
+            {
+                Name = _ => "requestTypeKey",
+                Value = _ => requestType.Key
+            });
+            form.Add(new PresetHiddenInput("portal-create-template")
+            {
+                Name = _ => "templateKey",
+                Value = _ => template?.Key ?? string.Empty
+            });
 
             form.AddPrimaryButton(new ControlFormItemButtonSubmit() { Text = _ => SubmitResource });
             form.AddPrimaryButton(new ControlFormItemButton() { Text = _ => CancelResource });

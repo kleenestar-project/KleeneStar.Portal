@@ -79,6 +79,60 @@ namespace KleeneStar.Portal.WWW.Api._1_
         }
 
         /// <summary>
+        /// Produces the <c>403 Forbidden</c> response of a caller who may not administer the
+        /// class structure the endpoint addresses.
+        /// </summary>
+        /// <returns>The response.</returns>
+        internal static IResponse Forbidden()
+        {
+            return new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Determines whether the caller may administer a class from the portal: publish it as
+        /// a request type, flag its templates, change its fields - and read that structure.
+        /// </summary>
+        /// <remarks>
+        /// The portal administration is the class administration of the operator side under
+        /// another roof, so it asks the same question on the same chain (class, then workspace;
+        /// administration fails closed). These endpoints used to answer anybody, an anonymous
+        /// caller included.
+        /// </remarks>
+        /// <param name="classId">The class, or <see langword="null"/> when it did not resolve.</param>
+        /// <param name="request">The request.</param>
+        /// <returns><see langword="true"/> when the caller may proceed.</returns>
+        internal static bool MayAdminister(Guid? classId, IRequest request)
+        {
+            return KleeneStar.Core.WebRestApi.ContentAuthorization.MayAdminister(classId, request);
+        }
+
+        /// <summary>
+        /// Determines whether the caller may administer the class a field belongs to.
+        /// </summary>
+        /// <param name="fieldId">The field.</param>
+        /// <param name="request">The request.</param>
+        /// <returns><see langword="true"/> when the caller may proceed.</returns>
+        internal static bool MayAdministerField(Guid fieldId, IRequest request)
+        {
+            return MayAdminister(KleeneStar.Core.CoreHub.FieldManager.GetField(fieldId)?.ClassId, request);
+        }
+
+        /// <summary>
+        /// Determines whether the caller may administer the class a form belongs to.
+        /// </summary>
+        /// <param name="formId">The form.</param>
+        /// <param name="request">The request.</param>
+        /// <returns><see langword="true"/> when the caller may proceed.</returns>
+        internal static bool MayAdministerForm(Guid formId, IRequest request)
+        {
+            var form = KleeneStar.Core.CoreHub.FormManager
+                .GetForms(new WebExpress.WebIndex.Queries.Query<KleeneStar.Model.Entities.Form>())
+                .FirstOrDefault(f => f.Id == formId);
+
+            return MayAdminister(form?.ClassId, request);
+        }
+
+        /// <summary>
         /// Attempts to deserialize the request body into <typeparamref name="T"/>.
         /// </summary>
         /// <typeparam name="T">The payload type.</typeparam>

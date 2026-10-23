@@ -59,6 +59,8 @@ namespace KleeneStar.Portal.WWW.Workspaces
         /// <param name="visualTree">The visual tree of the web application.</param>
         public void Process(IRenderContext renderContext, VisualTreeWebApp visualTree)
         {
+            global::KleeneStar.Portal.WebPermission.PortalAdminAuthorization.Demand(renderContext.Request);
+
             visualTree.Title = HeadlineResource;
             visualTree.Content.MainPanel.Headline.Title = HeadlineResource;
 

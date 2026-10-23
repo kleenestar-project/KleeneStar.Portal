@@ -15,7 +15,6 @@ namespace KleeneStar.Portal.WWW.Api._1_.Workspaces._workspacekey_.Classes
     /// <see cref="WorkspaceKeyParameter"/>.
     /// </summary>
     [Title("kleenestar.portal:api.admin.classes.title")]
-    [WorkspaceKeySegment]
     [Cache]
     public sealed class Index : IRestApi
     {
@@ -41,6 +40,12 @@ namespace KleeneStar.Portal.WWW.Api._1_.Workspaces._workspacekey_.Classes
             if (workspace is null)
             {
                 return PortalAdminApi.NotFound();
+            }
+
+            // the classes of a workspace are its administration's working material
+            if (!KleeneStar.Core.WebRestApi.ContentAuthorization.MayAdministerWorkspace(workspace.Id, request))
+            {
+                return PortalAdminApi.Forbidden();
             }
 
             var payload = _portalManager.GetClasses(workspace.Id)

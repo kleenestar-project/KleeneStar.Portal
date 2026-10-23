@@ -13,7 +13,6 @@ namespace KleeneStar.Portal.WWW.Api._1_.Classes._classid_.Statuses
     /// REST endpoint listing the active statuses of a class.
     /// </summary>
     [Title("kleenestar.portal:api.admin.statuses.title")]
-    [ClassIdSegment]
     [Cache]
     public sealed class Index : IRestApi
     {
@@ -43,6 +42,11 @@ namespace KleeneStar.Portal.WWW.Api._1_.Classes._classid_.Statuses
             if (_portalManager.GetClass(classId) is null)
             {
                 return PortalAdminApi.NotFound();
+            }
+
+            if (!PortalAdminApi.MayAdminister(classId, request))
+            {
+                return PortalAdminApi.Forbidden();
             }
 
             var payload = _portalManager.GetStatuses(classId)

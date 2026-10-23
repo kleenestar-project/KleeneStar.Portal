@@ -16,7 +16,6 @@ namespace KleeneStar.Portal.WWW.Api._1_.Classes._classid_.Fields
     /// required, unique).
     /// </summary>
     [Title("kleenestar.portal:api.admin.field.create.title")]
-    [ClassIdSegment]
     [Cache]
     public sealed class Create : IRestApi
     {
@@ -41,6 +40,11 @@ namespace KleeneStar.Portal.WWW.Api._1_.Classes._classid_.Fields
             if (classIdParameter is null || !Guid.TryParse(classIdParameter.Value, out var classId))
             {
                 return PortalAdminApi.BadRequest("Invalid class id.");
+            }
+
+            if (!PortalAdminApi.MayAdminister(classId, request))
+            {
+                return PortalAdminApi.Forbidden();
             }
 
             if (!PortalAdminApi.TryReadBody<FieldPayload>(request, out var payload)

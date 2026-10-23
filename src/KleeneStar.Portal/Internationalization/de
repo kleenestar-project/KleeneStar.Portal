@@ -37,6 +37,10 @@ issue.requester.label=Anfragesteller
 issue.shared-with.label=Geteilt mit
 issue.type.label=Typ
 issue.updated.label=Aktualisiert
+issue.visibility.label=Sichtbar für
+issue.visibility.restricted=Nur Beteiligte
+issue.visibility.organization=Ihre Organisation
+issue.visibility.change=Ändern
 issue.watchers.label=Beobachter
 
 # Home page
@@ -73,6 +77,9 @@ create.submit=Anfrage senden
 create.title.label=Titel
 create.unavailable=Dieser Anfrage-Typ ist nicht verfügbar oder nicht für dich freigegeben.
 create.urgency.label=Dringlichkeit
+create.audience.label=Sichtbar für
+create.audience.organization=Meine Organisation
+create.audience.participants=Nur ich und die Personen, mit denen ich teile
 
 # Issue detail page
 issue.comment.internal=Nur Service-Team
@@ -96,6 +103,13 @@ accept.cancel=Abbrechen
 accept.conflict=Für diesen Vorgang wurde noch keine Lösung vorgeschlagen.
 accept.description=Bestätige, dass dein Anliegen behoben ist. Der Vorgang wird damit geschlossen.
 accept.headline=Lösung bestätigen
+visibility.headline=Wer diesen Vorgang sieht
+visibility.restricted=Nur Sie und die Personen, mit denen Sie den Vorgang geteilt haben, sehen ihn.
+visibility.organization=Alle Mitglieder Ihrer Organisation sehen diesen Vorgang.
+visibility.not-found=Der Vorgang wurde nicht gefunden oder ist für Sie nicht sichtbar.
+visibility.restrict=Auf Beteiligte beschränken
+visibility.open=Meiner Organisation zeigen
+visibility.cancel=Abbrechen
 accept.not-found=Vorgang wurde nicht gefunden oder ist nicht für dich freigegeben.
 accept.submit=Lösung bestätigen
 
@@ -142,6 +156,11 @@ api.issue.reject.title=Lösung ablehnen
 api.issue.share.title=Vorgangs-Freigabe
 api.issue.title=Vorgang
 api.issue.watch.title=Vorgangs-Beobachtung
+api.issue.restrict.title=Vorgangs-Sichtbarkeit
+api.admin.class.title=Portal-Klasse
+api.admin.field.title=Portal-Feld
+api.admin.form.title=Portal-Formular
+api.admin.workspace.title=Portal-Arbeitsbereich
 api.issues.title=Vorgänge
 api.requesttypes.title=Anfragetypen-Katalog
 

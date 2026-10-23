@@ -93,6 +93,18 @@ namespace KleeneStar.Portal.WWW.Issues._issuekey_
         /// <summary>Resource key for the placeholder shown in place of a missing value.</summary>
         public const string NotAvailableResource = "kleenestar.portal:common.na";
 
+        /// <summary>Resource key for the label of the visibility row.</summary>
+        public const string VisibilityLabelResource = "kleenestar.portal:issue.visibility.label";
+
+        /// <summary>Resource key for an issue kept to its participants.</summary>
+        public const string VisibilityRestrictedResource = "kleenestar.portal:issue.visibility.restricted";
+
+        /// <summary>Resource key for an issue the organization sees.</summary>
+        public const string VisibilityOrganizationResource = "kleenestar.portal:issue.visibility.organization";
+
+        /// <summary>Resource key for the link to the visibility page.</summary>
+        public const string VisibilityChangeResource = "kleenestar.portal:issue.visibility.change";
+
         /// <summary>Resource key of the " · {0}" separator used to append byline segments.</summary>
         private const string SeparatorResource = "kleenestar.portal:common.separator.value";
 
@@ -211,8 +223,9 @@ namespace KleeneStar.Portal.WWW.Issues._issuekey_
                 var role = string.IsNullOrEmpty(comment.Role) ? string.Empty : Format(SeparatorResource, comment.Role);
                 var when = Format(SeparatorResource, PortalFormatter.FormatRelative(comment.Timestamp, Translate));
 
-                // an entry the requester shares with the service team only is marked, so
-                // the audience of what they are reading is never a guess
+                // an internal note reaches the service team only - a customer is never shown
+                // one - and is marked for the team reading the portal, so the audience of what
+                // they are reading is never a guess
                 var audience = string.Equals(comment.Visibility, CommentVisibilityExtensions.InternalTeamToken, StringComparison.OrdinalIgnoreCase)
                     ? Format(SeparatorResource, Translate(InternalCommentResource))
                     : string.Empty;
@@ -245,6 +258,12 @@ namespace KleeneStar.Portal.WWW.Issues._issuekey_
             var createdLabel = Translate(CreatedLabelResource);
             var updatedLabel = Translate(UpdatedLabelResource);
 
+            // who sees the issue is part of what it is; a request about a person may be kept
+            // to its participants, which the requester changes on the visibility page
+            var visibilityLabel = Translate(VisibilityLabelResource);
+            var visibilityText = Translate(issue.Restricted ? VisibilityRestrictedResource : VisibilityOrganizationResource);
+            var visibilityUri = PortalHub.GetUri<Visibility.Index>()?.BindParameters(new IssueKeyParameter(issue.Key));
+
             var details = new ControlTable() { Striped = _ => TypeStripedTable.Row, SuppressHeaders = _ => true }
                 .AddColumn("")
                 .AddColumn("")
@@ -267,6 +286,13 @@ namespace KleeneStar.Portal.WWW.Issues._issuekey_
                 (
                     new ControlTableCell() { Text = _ => updatedLabel },
                     new ControlTableCellPanel().Add(new ControlText() { Text = _ => updated })
+                )
+                .AddRow
+                (
+                    new ControlTableCell() { Text = _ => visibilityLabel },
+                    new ControlTableCellPanel()
+                        .Add(new ControlText() { Text = _ => visibilityText })
+                        .Add(new ControlLink() { Text = _ => VisibilityChangeResource, Uri = _ => visibilityUri })
                 );
             if (issue.RequiresApproval)
             {

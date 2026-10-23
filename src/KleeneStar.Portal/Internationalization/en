@@ -37,6 +37,10 @@ issue.requester.label=Requester
 issue.shared-with.label=Shared with
 issue.type.label=Type
 issue.updated.label=Updated
+issue.visibility.label=Visible to
+issue.visibility.restricted=Participants only
+issue.visibility.organization=Your organization
+issue.visibility.change=Change
 issue.watchers.label=Watchers
 
 # Home page
@@ -73,6 +77,9 @@ create.submit=Submit request
 create.title.label=Title
 create.unavailable=This request type is unavailable or not shared with you.
 create.urgency.label=Urgency
+create.audience.label=Visible to
+create.audience.organization=My organization
+create.audience.participants=Only me and the people I share it with
 
 # Issue detail page
 issue.comment.internal=Service team only
@@ -96,6 +103,13 @@ accept.cancel=Cancel
 accept.conflict=No resolution has been proposed for this issue yet.
 accept.description=Confirm that your request is resolved. The issue is closed with it.
 accept.headline=Confirm resolution
+visibility.headline=Who sees this issue
+visibility.restricted=Only you and the people you shared this issue with can see it.
+visibility.organization=Every member of your organization can see this issue.
+visibility.not-found=The issue was not found or is not visible to you.
+visibility.restrict=Restrict to participants
+visibility.open=Show to my organization
+visibility.cancel=Cancel
 accept.not-found=The issue was not found or is not shared with you.
 accept.submit=Confirm resolution
 
@@ -142,6 +156,11 @@ api.issue.reject.title=Reject resolution
 api.issue.share.title=Issue sharing
 api.issue.title=Issue
 api.issue.watch.title=Issue watch subscription
+api.issue.restrict.title=Issue audience
+api.admin.class.title=Portal class
+api.admin.field.title=Portal field
+api.admin.form.title=Portal form
+api.admin.workspace.title=Portal workspace
 api.issues.title=Issues
 api.requesttypes.title=Request type catalog
 

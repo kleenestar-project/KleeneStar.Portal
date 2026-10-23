@@ -102,13 +102,29 @@ namespace KleeneStar.Portal.WWW.Api._1_
         }
 
         /// <summary>
-        /// Runs <paramref name="action"/> and maps a <see cref="KleeneStar.Portal.WebManager.PortalConflictException"/>
-        /// to a <c>409 Conflict</c> response (see <see cref="Conflict"/>). Any other
-        /// exception is allowed to propagate so framework-level error handling
-        /// continues to work.
+        /// Wraps a refusal into a JSON <c>403 Forbidden</c> response: the caller may see the
+        /// issue but may not do what was asked of it.
+        /// </summary>
+        /// <param name="message">The reason of the refusal.</param>
+        /// <returns>The response.</returns>
+        internal static IResponse Forbidden(string message)
+        {
+            return new ResponseForbidden
+            {
+                Content = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { error = message }, JsonOptions))
+            }
+                .AddHeaderContentType("application/json");
+        }
+
+        /// <summary>
+        /// Runs <paramref name="action"/> and maps the manager's refusals to their status: a
+        /// <see cref="KleeneStar.Portal.WebManager.PortalConflictException"/> to <c>409 Conflict</c>
+        /// (see <see cref="Conflict"/>), a <see cref="KleeneStar.Portal.WebManager.PortalForbiddenException"/>
+        /// to <c>403 Forbidden</c>. Any other exception is allowed to propagate so
+        /// framework-level error handling continues to work.
         /// </summary>
         /// <param name="action">The action to execute.</param>
-        /// <returns>The response produced by <paramref name="action"/>, or a conflict response.</returns>
+        /// <returns>The response produced by <paramref name="action"/>, or the refusal.</returns>
         internal static IResponse RunWithConflictMapping(Func<IResponse> action)
         {
             try
@@ -118,6 +134,10 @@ namespace KleeneStar.Portal.WWW.Api._1_
             catch (KleeneStar.Portal.WebManager.PortalConflictException ex)
             {
                 return Conflict(ex.Message);
+            }
+            catch (KleeneStar.Portal.WebManager.PortalForbiddenException ex)
+            {
+                return Forbidden(ex.Message);
             }
         }
 
@@ -214,6 +234,7 @@ namespace KleeneStar.Portal.WWW.Api._1_
                 State = issue.PortalState,
                 Requester = ToDto(issue.Requester),
                 AssigneeLabel = issue.AssigneeLabel,
+                Restricted = issue.Restricted,
                 Created = issue.Created,
                 Updated = issue.Updated,
                 SharedWith = [.. issue.SharedWith.Select(ToDto)],
@@ -425,6 +446,9 @@ namespace KleeneStar.Portal.WWW.Api._1_
 
             /// <summary>Gets or sets the assigned service label.</summary>
             public string AssigneeLabel { get; init; }
+
+            /// <summary>Gets or sets whether the issue is kept to its participants.</summary>
+            public bool Restricted { get; init; }
 
             /// <summary>Gets or sets the creation timestamp.</summary>
             public DateTime Created { get; init; }

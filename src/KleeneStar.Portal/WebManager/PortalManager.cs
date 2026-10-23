@@ -1,6 +1,8 @@
 using KleeneStar.Core;
 using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
+using KleeneStar.Core.WebPermission;
+using KleeneStar.Core.WebPermissions;
 using KleeneStar.Model.Entities;
 using KleeneStar.Portal.WebDomain;
 using System;
@@ -36,6 +38,24 @@ namespace KleeneStar.Portal.WebManager
     /// rows of portal-visible classes, and the collapsed
     /// <see cref="PortalIssueState"/> is derived from the object's workflow-field value
     /// via the status's <see cref="StatusCategory"/>.
+    /// <para>
+    /// <b>Who acts is the session's caller.</b> Every use case answers for the identity
+    /// <c>ISessionManager.GetCurrentIdentityId</c> names on this call chain - the signed-in
+    /// user of the request, or the identity a <c>BeginIdentity</c> scope stands in with. There
+    /// is no stand-in identity: an anonymous caller sees no issue and changes nothing. Only
+    /// with nobody acting at all (start-up, background work) does the manager answer as the
+    /// system, which sees every issue.
+    /// </para>
+    /// <para>
+    /// <b>The portal has its own access rule</b> (<see cref="IssueAccess"/>), so its reads of
+    /// the objects lift the operator-side narrowing and apply that rule instead: the requester
+    /// and the identities an issue was shared with always see it; the members of the
+    /// requester's organization (tenant) see it while it is not restricted to its participants
+    /// and its security level clears them; an operator-side account (no tenant) sees what the
+    /// operator side lets it read. The workspace grants of the operator side are no answer
+    /// here - a customer is not given read access to a service desk, yet must see the request
+    /// they filed in it.
+    /// </para>
     /// </remarks>
     public sealed class PortalManager : IPortalManager
     {
@@ -43,8 +63,8 @@ namespace KleeneStar.Portal.WebManager
         private readonly IHttpServerContext _httpServerContext;
 
         /// <summary>
-        /// Serializes issue creation so the per-workspace key allocation
-        /// (<see cref="NextKey"/>) cannot hand out the same key twice.
+        /// Serializes issue creation so the per-workspace key allocation cannot hand out the
+        /// same key twice.
         /// </summary>
         private readonly object _gate = new();
 
@@ -53,15 +73,6 @@ namespace KleeneStar.Portal.WebManager
         /// </summary>
         private bool _connected;
 
-        /// <summary>
-        /// Identity used as the acting portal user while the WebExpress identity flow
-        /// does not yet expose the authenticated identity on the request. Mirrors the
-        /// fallback of <c>KleeneStar.Core.WebManager.SessionManager</c> (the seeded
-        /// admin identity) so portal actions are attributed to a valid row.
-        /// </summary>
-        public static readonly Guid FallbackIdentityId = Guid.Parse("77087646-B13A-44B1-9BAC-6E66443CEDFD");
-
-        /// <summary>
         /// <inheritdoc/>
         public event EventHandler<IIssue> IssueCreated;
         /// <inheritdoc/>
@@ -105,18 +116,26 @@ namespace KleeneStar.Portal.WebManager
         }
 
         /// <inheritdoc/>
-        public IssueParticipant CurrentUser => ToParticipant(CoreHub.IdentityManager.GetIdentity(FallbackIdentityId));
+        public IssueParticipant CurrentUser
+        {
+            get
+            {
+                var caller = Caller;
+
+                return caller == Guid.Empty ? null : ToParticipant(CoreHub.IdentityManager.GetIdentity(caller));
+            }
+        }
 
         /// <inheritdoc/>
         public IReadOnlyList<IssueParticipant> GetOrganizationMembers()
         {
-            return GetOrganizationMembers(FallbackIdentityId);
+            return GetOrganizationMembers(null);
         }
 
         /// <inheritdoc/>
         public IReadOnlyList<IssueParticipant> GetOrganizationMembers(Guid? callerId)
         {
-            var me = callerId ?? FallbackIdentityId;
+            var me = callerId ?? Caller;
             var caller = me == Guid.Empty ? null : CoreHub.IdentityManager.GetIdentity(me);
 
             // no tenant, no organization: an operator-side account has no colleagues in the
@@ -136,9 +155,9 @@ namespace KleeneStar.Portal.WebManager
         /// <inheritdoc/>
         public IReadOnlyList<IRequestType> GetRequestTypes()
         {
-            var classes = GetPortalClasses();
+            var viewer = Viewer.Resolve(null);
 
-            return [.. classes.Select(cls => BuildRequestType(cls))];
+            return [.. GetPortalClasses().Where(viewer.Offers).Select(BuildRequestType)];
         }
 
         /// <inheritdoc/>
@@ -156,16 +175,28 @@ namespace KleeneStar.Portal.WebManager
         /// <inheritdoc/>
         public IReadOnlyList<IIssue> GetIssues(IssueScope scope)
         {
-            return GetIssues(scope, FallbackIdentityId);
+            return GetIssues(scope, null);
         }
 
         /// <inheritdoc/>
         public IReadOnlyList<IIssue> GetIssues(IssueScope scope, Guid? callerId)
         {
+            var viewer = Viewer.Resolve(callerId);
+
+            if (!viewer.IsSystem && viewer.Id == Guid.Empty)
+            {
+                return [];
+            }
+
+            // the organization is a tenant: an operator-side account belongs to none and has no
+            // organization scope to list
+            if (scope == IssueScope.Organization && !viewer.IsSystem && viewer.TenantId is null)
+            {
+                return [];
+            }
+
             var classes = GetPortalClasses();
-            var requestTypes = classes
-                .Select(cls => (cls.Id, RequestType: BuildRequestType(cls)))
-                .ToDictionary(x => x.Id, x => x.RequestType);
+            var requestTypes = classes.ToDictionary(cls => cls.Id, BuildRequestType);
 
             // load the share/watch relations once and group them by object so the
             // per-issue projection does not issue one query per row.
@@ -178,69 +209,47 @@ namespace KleeneStar.Portal.WebManager
                 .GroupBy(w => w.ObjectId)
                 .ToDictionary(g => g.Key, g => g.ToList());
 
-            var me = callerId ?? FallbackIdentityId;
-            var meIdentity = CoreHub.IdentityManager.GetIdentity(me);
-
-            // OrgScope tenant isolation (concept §Permissions): the caller sees
-            // every issue of a portal-visible class whose workspace is shared
-            // with the caller's tenant. Identities without a tenant (operator-side
-            // accounts) see nothing in OrgScope. MineScope is unaffected.
-            Guid? callerTenantId = meIdentity?.TenantId;
-            HashSet<Guid> orgScopeWorkspaceIds = null;
-            if (scope == IssueScope.Organization)
-            {
-                if (callerTenantId is null)
-                {
-                    return [];
-                }
-
-                orgScopeWorkspaceIds = CoreHub.WorkspaceManager
-                    .GetWorkspaces(new Query<Workspace>())
-                    .Where(w => w.Tenants != null && w.Tenants.Any(t => t.Id == callerTenantId.Value))
-                    .Select(w => w.Id)
-                    .ToHashSet();
-
-                if (orgScopeWorkspaceIds.Count == 0)
-                {
-                    return [];
-                }
-            }
-
             var issues = new List<IIssue>();
 
             foreach (var cls in classes)
             {
                 var context = BuildClassContext(cls);
-                var objects = CoreHub.ObjectManager
-                    .GetObjects(new Query<ObjectEntity>().WhereEquals(x => x.ClassId, cls.Id));
+                var objects = ReadObjects(new Query<ObjectEntity>().WhereEquals(x => x.ClassId, cls.Id));
+                var operatorReadable = viewer.IsOperator ? viewer.ReadableIds(cls.Id) : null;
 
                 foreach (var entity in objects)
                 {
                     sharesByObject.TryGetValue(entity.Id, out var shares);
                     watchersByObject.TryGetValue(entity.Id, out var watchers);
 
-                    if (scope == IssueScope.Mine)
+                    var access = viewer.AccessTo(entity, shares, operatorReadable);
+
+                    if (access == IssueAccess.None)
                     {
-                        var isMine = entity.CreatorId == me
-                            || (shares?.Any(s => s.IdentityId == me) ?? false)
-                            || (watchers?.Any(w => w.IdentityId == me) ?? false);
+                        continue;
+                    }
+
+                    if (scope == IssueScope.Mine && !viewer.IsSystem)
+                    {
+                        var isMine = access is IssueAccess.Requester or IssueAccess.Participant
+                            || (watchers?.Any(w => w.IdentityId == viewer.Id) ?? false);
 
                         if (!isMine)
                         {
                             continue;
                         }
                     }
-                    else if (scope == IssueScope.Organization)
+                    else if (scope == IssueScope.Organization && !viewer.IsSystem)
                     {
-                        // tenant isolation: drop issues whose workspace is not
-                        // shared with the caller's tenant
-                        if (!orgScopeWorkspaceIds!.Contains(entity.WorkspaceId))
+                        // the organization's issues are the ones its members filed; a request of
+                        // another tenant in a workspace both are served by is not part of it
+                        if (viewer.TenantOf(entity.CreatorId) != viewer.TenantId)
                         {
                             continue;
                         }
                     }
 
-                    issues.Add(BuildIssue(entity, context, requestTypes[cls.Id], shares, watchers, comments: null));
+                    issues.Add(BuildIssue(entity, context, requestTypes[cls.Id], shares, watchers, comments: null, viewer: viewer));
                 }
             }
 
@@ -250,20 +259,31 @@ namespace KleeneStar.Portal.WebManager
         /// <inheritdoc/>
         public IIssue GetIssue(string issueKey)
         {
-            var entity = ResolveIssueObject(issueKey, out var cls);
+            var viewer = Viewer.Resolve(null);
+            var entity = ResolveIssueObject(issueKey, viewer, out var cls, out _);
 
-            return entity is null ? null : BuildIssue(entity, cls);
+            return entity is null ? null : BuildIssue(entity, cls, viewer);
         }
 
         /// <inheritdoc/>
-        public IIssue CreateIssue(string requestTypeKey, string templateKey, string title, string description, string priority)
+        public IIssue CreateIssue(string requestTypeKey, string templateKey, string title, string description, string priority, bool restricted = false)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(requestTypeKey);
             ArgumentException.ThrowIfNullOrWhiteSpace(title);
 
+            var viewer = Viewer.Resolve(null);
+
+            if (!viewer.IsSystem && viewer.Id == Guid.Empty)
+            {
+                throw new PortalForbiddenException("Sign in to submit a request.");
+            }
+
             lock (_gate)
             {
+                // a request type the caller is not offered does not exist for them, whatever its
+                // key - a customer cannot file into a workspace that does not serve their tenant
                 var cls = GetPortalClasses()
+                    .Where(viewer.Offers)
                     .FirstOrDefault(c => string.Equals(RequestTypeKey(c), Slug(requestTypeKey), StringComparison.OrdinalIgnoreCase))
                     ?? throw new InvalidOperationException($"Request type '{requestTypeKey}' not found.");
 
@@ -276,12 +296,12 @@ namespace KleeneStar.Portal.WebManager
                     : context.Templates.FirstOrDefault(f => string.Equals(Slug(f.Name), Slug(templateKey), StringComparison.OrdinalIgnoreCase));
 
                 var workspace = CoreHub.WorkspaceManager.GetWorkspace(cls.WorkspaceId);
-                var me = FallbackIdentityId;
+                Guid? me = viewer.Id == Guid.Empty ? null : viewer.Id;
                 var now = DateTime.UtcNow;
 
                 var entity = new ObjectEntity
                 {
-                    Key = NextKey(workspace),
+                    Key = CoreHub.ObjectManager.NextObjectKey(cls.WorkspaceId) ?? NextFallbackKey(workspace),
                     Summary = title,
                     Description = string.IsNullOrWhiteSpace(description)
                         ? template?.Description ?? string.Empty
@@ -291,6 +311,8 @@ namespace KleeneStar.Portal.WebManager
                     WorkspaceId = cls.WorkspaceId,
                     Workspace = null,
                     ClassId = cls.Id,
+                    SecurityLevelId = CoreHub.SecurityLevelManager?.GetDefaultSecurityLevel(cls.Id)?.Id,
+                    PortalRestricted = restricted,
                     CreatorId = me,
                     UpdaterId = me,
                     Created = now,
@@ -318,9 +340,12 @@ namespace KleeneStar.Portal.WebManager
                 }
 
                 // the requester always watches their own submission
-                CoreHub.WatcherManager.Add(entity.Id, me);
+                if (me is Guid requesterId)
+                {
+                    CoreHub.WatcherManager.Add(entity.Id, requesterId);
+                }
 
-                var issue = BuildIssue(ReloadObject(entity.Id) ?? entity, cls);
+                var issue = BuildIssue(ReadObject(entity.Id) ?? entity, cls, viewer);
 
                 IssueCreated?.Invoke(this, issue);
 
@@ -333,34 +358,48 @@ namespace KleeneStar.Portal.WebManager
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(text);
 
-            var entity = ResolveIssueObject(issueKey, out var cls);
+            var viewer = Viewer.Resolve(null);
+            var entity = ResolveIssueObject(issueKey, viewer, out var cls, out _);
             if (entity is null)
             {
                 return null;
             }
 
-            var me = FallbackIdentityId;
-            var now = DateTime.UtcNow;
+            if (viewer.Id == Guid.Empty)
+            {
+                throw new PortalForbiddenException("A comment needs an author.");
+            }
 
             // an unknown token widens rather than narrows: CommentVisibilityExtensions.Parse
             // reads anything it does not recognise as Public, so a client that misspells the
             // flag never gets a comment that is quietly hidden from the requester. The REST
             // endpoint rejects a malformed token before it reaches here.
+            var audience = CommentVisibilityExtensions.Parse(visibility);
+
+            // a customer cannot address the service team's notes - they would not see what
+            // they wrote; the composer offers the internal audience to the service team only
+            if (audience == CommentVisibility.InternalTeam && !CommentAudienceOf(entity, viewer).MayWriteInternal)
+            {
+                throw new PortalForbiddenException("Only the service team writes internal notes.");
+            }
+
+            var now = DateTime.UtcNow;
+
             var comment = new Comment
             {
                 ObjectId = entity.Id,
-                AuthorId = me,
+                AuthorId = viewer.Id,
                 Content = text,
                 State = CommentState.Active,
-                Visibility = CommentVisibilityExtensions.Parse(visibility),
+                Visibility = audience,
                 Created = now,
                 Updated = now
             };
 
             CoreHub.CommentManager.Add(comment);
-            Touch(entity, now);
+            Touch(entity, now, viewer);
 
-            var issue = BuildIssue(entity, cls);
+            var issue = BuildIssue(entity, cls, viewer);
             var projected = issue.Comments.LastOrDefault(c => c.Id == comment.Id.ToString())
                 ?? ToIssueComment(comment, issue.Requester);
 
@@ -375,10 +414,18 @@ namespace KleeneStar.Portal.WebManager
         {
             ArgumentNullException.ThrowIfNull(identityIds);
 
-            var entity = ResolveIssueObject(issueKey, out var cls);
+            var viewer = Viewer.Resolve(null);
+            var entity = ResolveIssueObject(issueKey, viewer, out var cls, out var access);
             if (entity is null)
             {
                 return null;
+            }
+
+            // sharing widens the audience of somebody's request, so it is the participants'
+            // decision: the requester and those it was already shared with
+            if (access is not (IssueAccess.Requester or IssueAccess.Participant or IssueAccess.System))
+            {
+                throw new PortalForbiddenException("Only the participants of an issue share it.");
             }
 
             var added = 0;
@@ -386,7 +433,7 @@ namespace KleeneStar.Portal.WebManager
             // the share dialog offers the caller's organization, and what it did not offer is
             // not accepted from a hand-made request either (concept: a cross-tenant share is
             // refused); an identity outside it is skipped, not shared
-            var organization = GetOrganizationMembers()
+            var organization = GetOrganizationMembers(viewer.Id)
                 .Select(m => m.Id)
                 .Where(id => !string.IsNullOrWhiteSpace(id))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -407,10 +454,10 @@ namespace KleeneStar.Portal.WebManager
 
             if (added > 0)
             {
-                Touch(entity, DateTime.UtcNow);
+                Touch(entity, DateTime.UtcNow, viewer);
             }
 
-            var issue = BuildIssue(entity, cls);
+            var issue = BuildIssue(entity, cls, viewer);
 
             if (added > 0)
             {
@@ -424,27 +471,79 @@ namespace KleeneStar.Portal.WebManager
         /// <inheritdoc/>
         public IIssue UnshareIssue(string issueKey, string identityId)
         {
-            var entity = ResolveIssueObject(issueKey, out var cls);
+            var viewer = Viewer.Resolve(null);
+            var entity = ResolveIssueObject(issueKey, viewer, out var cls, out var access);
             if (entity is null)
             {
                 return null;
             }
 
-            var removed = Guid.TryParse(identityId, out var parsed)
-                && CoreHub.ShareManager.Remove(entity.Id, parsed);
+            var parsed = Guid.TryParse(identityId, out var id) ? id : Guid.Empty;
+
+            // the requester decides who shares their request; anyone it was shared with may
+            // leave it, but not show somebody else the door
+            var allowed = access is IssueAccess.Requester or IssueAccess.System
+                || (access == IssueAccess.Participant && parsed == viewer.Id);
+
+            if (!allowed)
+            {
+                throw new PortalForbiddenException("Only the requester revokes a share of somebody else.");
+            }
+
+            var removed = parsed != Guid.Empty && CoreHub.ShareManager.Remove(entity.Id, parsed);
 
             if (removed)
             {
-                Touch(entity, DateTime.UtcNow);
+                Touch(entity, DateTime.UtcNow, viewer);
             }
 
-            var issue = BuildIssue(entity, cls);
+            // a participant who just left no longer sees the issue: they are answered with its
+            // head data, which they saw a moment ago, and not with its timeline
+            var issue = removed && parsed == viewer.Id && access == IssueAccess.Participant
+                ? BuildIssue(entity, BuildClassContext(cls), BuildRequestType(cls), shares: null, watchers: null, comments: null, viewer: Viewer.System)
+                : BuildIssue(entity, cls, viewer);
 
             if (removed)
             {
                 IssueUnshared?.Invoke(this, issue);
                 IssueUpdated?.Invoke(this, issue);
             }
+
+            return issue;
+        }
+
+        /// <inheritdoc/>
+        public IIssue SetRestricted(string issueKey, bool restricted)
+        {
+            var viewer = Viewer.Resolve(null);
+            var entity = ResolveIssueObject(issueKey, viewer, out var cls, out var access);
+            if (entity is null)
+            {
+                return null;
+            }
+
+            // the requester decides whether their organization sees their request; the service
+            // team may change it on the operator's word when it may change the object at all
+            var allowed = access is IssueAccess.Requester or IssueAccess.System
+                || (access == IssueAccess.ServiceTeam
+                    && CoreHub.PermissionManager?.IsGranted(viewer.Id, typeof(ObjectUpdatePermission), PageAuthorization.ChainOf(entity)) != false);
+
+            if (!allowed)
+            {
+                throw new PortalForbiddenException("Only the requester changes who sees the issue.");
+            }
+
+            if (entity.PortalRestricted == restricted)
+            {
+                return BuildIssue(entity, cls, viewer);
+            }
+
+            entity.PortalRestricted = restricted;
+            Touch(entity, DateTime.UtcNow, viewer);
+
+            var issue = BuildIssue(entity, cls, viewer);
+
+            IssueUpdated?.Invoke(this, issue);
 
             return issue;
         }
@@ -464,14 +563,17 @@ namespace KleeneStar.Portal.WebManager
         /// <inheritdoc/>
         public IIssue AcceptResolution(string issueKey)
         {
-            var entity = ResolveIssueObject(issueKey, out var cls);
+            var viewer = Viewer.Resolve(null);
+            var entity = ResolveIssueObject(issueKey, viewer, out var cls, out var access);
             if (entity is null)
             {
                 return null;
             }
 
+            RequireRequester(access);
+
             var context = BuildClassContext(cls);
-            var current = BuildIssue(entity, cls);
+            var current = BuildIssue(entity, cls, viewer);
 
             // closed issues are an idempotent no-op: re-accepting after the issue has
             // been closed is allowed (concept §API: "Accepting is idempotent on closed
@@ -502,10 +604,10 @@ namespace KleeneStar.Portal.WebManager
 
             var now = DateTime.UtcNow;
             SetFieldValue(entity.Id, context.WorkflowField.Id, target.Name);
-            AddSystemComment(entity.Id, "Resolution accepted. The issue has been closed.", now);
-            Touch(entity, now);
+            AddSystemComment(entity.Id, "Resolution accepted. The issue has been closed.", now, viewer);
+            Touch(entity, now, viewer);
 
-            var issue = BuildIssue(entity, cls);
+            var issue = BuildIssue(entity, cls, viewer);
 
             IssueResolutionAccepted?.Invoke(this, issue);
             IssueClosed?.Invoke(this, issue);
@@ -519,14 +621,17 @@ namespace KleeneStar.Portal.WebManager
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(reason);
 
-            var entity = ResolveIssueObject(issueKey, out var cls);
+            var viewer = Viewer.Resolve(null);
+            var entity = ResolveIssueObject(issueKey, viewer, out var cls, out var access);
             if (entity is null)
             {
                 return null;
             }
 
+            RequireRequester(access);
+
             var context = BuildClassContext(cls);
-            var current = BuildIssue(entity, cls);
+            var current = BuildIssue(entity, cls, viewer);
 
             if (current.PortalState != PortalIssueState.Resolved)
             {
@@ -542,10 +647,10 @@ namespace KleeneStar.Portal.WebManager
 
             var now = DateTime.UtcNow;
             SetFieldValue(entity.Id, context.WorkflowField.Id, target.Name);
-            AddSystemComment(entity.Id, $"Resolution rejected: {reason}", now);
-            Touch(entity, now);
+            AddSystemComment(entity.Id, $"Resolution rejected: {reason}", now, viewer);
+            Touch(entity, now, viewer);
 
-            var issue = BuildIssue(entity, cls);
+            var issue = BuildIssue(entity, cls, viewer);
 
             IssueResolutionRejected?.Invoke(this, issue);
             IssueUpdated?.Invoke(this, issue);
@@ -560,30 +665,38 @@ namespace KleeneStar.Portal.WebManager
         {
             GC.SuppressFinalize(this);
         }
+
         /// <inheritdoc/>
         public IReadOnlyList<Workspace> GetWorkspaces()
         {
-            return GetWorkspaces(FallbackIdentityId);
+            return GetWorkspaces(null);
         }
 
         /// <inheritdoc/>
         public IReadOnlyList<Workspace> GetWorkspaces(Guid? callerId)
         {
-            var me = callerId ?? FallbackIdentityId;
-            var meIdentity = CoreHub.IdentityManager.GetIdentity(me);
+            var viewer = Viewer.Resolve(callerId);
 
-            var workspaces = CoreHub.WorkspaceManager
-                .GetWorkspaces(new Query<Workspace>())
+            if (!viewer.IsSystem && viewer.Id == Guid.Empty)
+            {
+                return [];
+            }
+
+            var workspaces = ReadWorkspaces()
                 .Where(w => w.State == WorkspaceState.Active);
 
             // tenant-scoped: an identity with a tenant only sees workspaces that
-            // share one of its tenants. Operator-side identities (no tenant)
-            // see every active workspace — useful for an internal "Settings"
-            // view of the portal.
-            if (meIdentity?.TenantId is { } callerTenantId)
+            // serve it. Operator-side identities (no tenant) see every active workspace
+            // the operator side lets them read - useful for an internal "Settings" view
+            // of the portal.
+            if (viewer.TenantId is { } callerTenantId)
             {
                 workspaces = workspaces
                     .Where(w => w.Tenants != null && w.Tenants.Any(t => t.Id == callerTenantId));
+            }
+            else if (!viewer.IsSystem)
+            {
+                workspaces = workspaces.Where(w => ContentVisibility.MayRead(w.Id));
             }
 
             return [.. workspaces.OrderBy(w => w.Name, StringComparer.OrdinalIgnoreCase)];
@@ -799,14 +912,20 @@ namespace KleeneStar.Portal.WebManager
         /// </exception>
         private IIssue SetWatching(string issueKey, bool watch)
         {
-            var entity = ResolveIssueObject(issueKey, out var cls);
+            var viewer = Viewer.Resolve(null);
+            var entity = ResolveIssueObject(issueKey, viewer, out var cls, out _);
 
             if (entity is null)
             {
                 return null;
             }
 
-            var me = FallbackIdentityId;
+            if (viewer.Id == Guid.Empty)
+            {
+                throw new PortalForbiddenException("Sign in to watch an issue.");
+            }
+
+            var me = viewer.Id;
 
             // the unwatch path is a state conflict when the caller has nothing to
             // unsubscribe from — the REST layer maps this to 409.
@@ -821,10 +940,10 @@ namespace KleeneStar.Portal.WebManager
 
             if (changed)
             {
-                Touch(entity, DateTime.UtcNow);
+                Touch(entity, DateTime.UtcNow, viewer);
             }
 
-            var issue = BuildIssue(entity, cls);
+            var issue = BuildIssue(entity, cls, viewer);
 
             if (changed)
             {
@@ -834,6 +953,20 @@ namespace KleeneStar.Portal.WebManager
             }
 
             return issue;
+        }
+
+        /// <summary>
+        /// Refuses an action that belongs to the requester alone - accepting or rejecting the
+        /// resolution of their request.
+        /// </summary>
+        /// <param name="access">The caller's access to the issue.</param>
+        /// <exception cref="PortalForbiddenException">The caller is not the requester.</exception>
+        private static void RequireRequester(IssueAccess access)
+        {
+            if (access is not (IssueAccess.Requester or IssueAccess.System))
+            {
+                throw new PortalForbiddenException("Only the requester accepts or rejects a resolution.");
+            }
         }
 
         /// <summary>
@@ -848,7 +981,9 @@ namespace KleeneStar.Portal.WebManager
         /// <returns>The projected issue when the event was raised, <see langword="null"/> otherwise.</returns>
         public IIssue NotifyResolutionProposed(Guid objectId)
         {
-            var entity = CoreHub.ObjectManager.GetObject(objectId);
+            // the event announces what happened to the issue, not what the operator who moved
+            // it may read - the subscribers address the requester
+            var entity = ReadObject(objectId);
             if (entity is null)
             {
                 return null;
@@ -861,7 +996,7 @@ namespace KleeneStar.Portal.WebManager
             }
 
             var context = BuildClassContext(cls);
-            var issue = BuildIssue(entity, context, requestType: null, shares: null, watchers: null, comments: null);
+            var issue = BuildIssue(entity, context, requestType: null, shares: null, watchers: null, comments: null, viewer: Viewer.System);
 
             if (issue.PortalState == PortalIssueState.Resolved)
             {
@@ -914,6 +1049,49 @@ namespace KleeneStar.Portal.WebManager
             {
                 _httpServerContext?.Log?.Exception(ex);
             }
+        }
+
+        /// <summary>
+        /// Gets the identity acting on this call chain, or <see cref="Guid.Empty"/> for an
+        /// anonymous caller and for the system.
+        /// </summary>
+        private static Guid Caller => CoreHub.SessionManager?.GetCurrentIdentityId(null) ?? Guid.Empty;
+
+        /// <summary>
+        /// Reads an object by id the way the portal's own rule needs it - without the
+        /// operator-side narrowing, which <see cref="Viewer.AccessTo"/> replaces.
+        /// </summary>
+        /// <param name="objectId">The object id.</param>
+        /// <returns>The object, or <see langword="null"/> when it does not exist.</returns>
+        private static ObjectEntity ReadObject(Guid objectId)
+        {
+            using var unrestricted = CoreHub.SecurityLevelManager?.BeginUnrestricted();
+
+            return CoreHub.ObjectManager.GetObject(objectId);
+        }
+
+        /// <summary>
+        /// Reads objects without the operator-side narrowing, for the portal's own rule.
+        /// </summary>
+        /// <param name="query">The query.</param>
+        /// <returns>The materialized objects.</returns>
+        private static List<ObjectEntity> ReadObjects(IQuery<ObjectEntity> query)
+        {
+            using var unrestricted = CoreHub.SecurityLevelManager?.BeginUnrestricted();
+
+            return [.. CoreHub.ObjectManager.GetObjects(query)];
+        }
+
+        /// <summary>
+        /// Reads the workspaces without the operator-side narrowing: which workspaces serve a
+        /// tenant is a fact of the installation, not of the caller's grants.
+        /// </summary>
+        /// <returns>The workspaces.</returns>
+        private static List<Workspace> ReadWorkspaces()
+        {
+            using var unrestricted = CoreHub.SecurityLevelManager?.BeginUnrestricted();
+
+            return [.. CoreHub.WorkspaceManager.GetWorkspaces(new Query<Workspace>())];
         }
 
         /// <summary>
@@ -978,6 +1156,7 @@ namespace KleeneStar.Portal.WebManager
                 ? Slug(cls.Name)
                 : Slug(prefix + "-" + cls.Name);
         }
+
         /// <summary>
         /// Returns the active forms of the given class that are flagged as portal
         /// templates. Internal helper used by the request-type projection.
@@ -993,22 +1172,35 @@ namespace KleeneStar.Portal.WebManager
         }
 
         /// <summary>
-        /// Resolves the object behind an issue key and verifies that its class is
-        /// portal-visible — objects of internal classes never surface as issues.
+        /// Resolves the object behind an issue key, verifies that its class is portal-visible
+        /// and that the viewer may see it.
         /// </summary>
+        /// <remarks>
+        /// An issue the viewer may not see is answered exactly like one that does not exist,
+        /// so a guessed key discloses nothing.
+        /// </remarks>
         /// <param name="issueKey">The issue key (e.g. <c>SD-17</c>).</param>
+        /// <param name="viewer">The viewer.</param>
         /// <param name="cls">When the method returns, the portal-visible class of the object.</param>
+        /// <param name="access">When the method returns, the viewer's access to the issue.</param>
         /// <returns>The object entity, or <see langword="null"/>.</returns>
-        private static ObjectEntity ResolveIssueObject(string issueKey, out Class cls)
+        private static ObjectEntity ResolveIssueObject(string issueKey, Viewer viewer, out Class cls, out IssueAccess access)
         {
             cls = null;
+            access = IssueAccess.None;
 
             if (string.IsNullOrWhiteSpace(issueKey))
             {
                 return null;
             }
 
-            var entity = CoreHub.ObjectManager.GetObjectByKey(issueKey);
+            ObjectEntity entity;
+
+            using (CoreHub.SecurityLevelManager?.BeginUnrestricted())
+            {
+                entity = CoreHub.ObjectManager.GetObjectByKey(issueKey);
+            }
+
             if (entity is null)
             {
                 return null;
@@ -1021,18 +1213,15 @@ namespace KleeneStar.Portal.WebManager
                 return null;
             }
 
-            return entity;
-        }
+            access = viewer.AccessTo(entity, CoreHub.ShareManager.GetShares(entity.Id).ToList(), operatorReadable: null);
 
-        /// <summary>
-        /// Reloads an object after creation so navigation data populated by the data
-        /// layer (e.g. the workspace) is available to the projection.
-        /// </summary>
-        /// <param name="objectId">The object id.</param>
-        /// <returns>The reloaded object, or <see langword="null"/>.</returns>
-        private static ObjectEntity ReloadObject(Guid objectId)
-        {
-            return CoreHub.ObjectManager.GetObject(objectId);
+            if (access == IssueAccess.None)
+            {
+                cls = null;
+                return null;
+            }
+
+            return entity;
         }
 
         /// <summary>
@@ -1074,17 +1263,18 @@ namespace KleeneStar.Portal.WebManager
         /// </summary>
         /// <param name="entity">The underlying object.</param>
         /// <param name="cls">The portal-visible class of the object.</param>
+        /// <param name="viewer">The viewer the timeline and the relations are narrowed for.</param>
         /// <returns>The issue projection.</returns>
-        private static Issue BuildIssue(ObjectEntity entity, Class cls)
+        private static Issue BuildIssue(ObjectEntity entity, Class cls, Viewer viewer)
         {
             var context = BuildClassContext(cls);
             var requestType = BuildRequestType(cls);
             var shares = CoreHub.ShareManager.GetShares(entity.Id).ToList();
             var watchers = CoreHub.WatcherManager.GetWatchers(entity.Id).ToList();
             var comments = CoreHub.CommentManager.GetComments(entity.Id).ToList();
-            var relations = BuildRelations(entity);
+            var relations = BuildRelations(entity, viewer);
 
-            return BuildIssue(entity, context, requestType, shares, watchers, comments, relations);
+            return BuildIssue(entity, context, requestType, shares, watchers, comments, viewer, relations);
         }
 
         /// <summary>
@@ -1092,17 +1282,18 @@ namespace KleeneStar.Portal.WebManager
         /// </summary>
         /// <remarks>
         /// The portal is a constrained view, so a relation is projected only when its far
-        /// end is itself a portal issue the caller could open by key: an object of a
-        /// portal-visible class, answered by <c>ObjectManager</c> (which applies the security
-        /// levels). A link to an internal record - a problem, a change, a bug in the
-        /// development workspace - or to an external address stays on the operator side:
-        /// its key, title and state are the service team's working material, not the
-        /// requester's. Obsolete relations are history and are left out as well. The caption
-        /// is read from this issue's side, the inverse label where it is the target.
+        /// end is itself a portal issue the viewer could open by key: an object of a
+        /// portal-visible class that the portal's own rule lets the viewer see. A link to an
+        /// internal record - a problem, a change, a bug in the development workspace - or to an
+        /// external address stays on the operator side: its key, title and state are the
+        /// service team's working material, not the requester's. Obsolete relations are
+        /// history and are left out as well. The caption is read from this issue's side, the
+        /// inverse label where it is the target.
         /// </remarks>
         /// <param name="entity">The object whose relations are projected.</param>
+        /// <param name="viewer">The viewer.</param>
         /// <returns>The projected relations, ordered by caption and key.</returns>
-        private static List<IssueRelation> BuildRelations(ObjectEntity entity)
+        private static List<IssueRelation> BuildRelations(ObjectEntity entity, Viewer viewer)
         {
             var contexts = new Dictionary<Guid, ClassContext>();
             var relations = new List<IssueRelation>();
@@ -1123,9 +1314,7 @@ namespace KleeneStar.Portal.WebManager
                     continue;
                 }
 
-                // re-read through the object manager rather than the navigation property,
-                // so the caller's clearance decides whether the far end exists for them
-                var other = CoreHub.ObjectManager.GetObject(otherId);
+                var other = ReadObject(otherId);
                 if (other is null)
                 {
                     continue;
@@ -1138,7 +1327,9 @@ namespace KleeneStar.Portal.WebManager
                     contexts[other.ClassId] = context;
                 }
 
-                if (context is null)
+                // the far end exists for the viewer only when the portal would open it for them
+                if (context is null
+                    || viewer.AccessTo(other, CoreHub.ShareManager.GetShares(other.Id).ToList(), operatorReadable: null) == IssueAccess.None)
                 {
                     continue;
                 }
@@ -1178,6 +1369,7 @@ namespace KleeneStar.Portal.WebManager
         /// <param name="shares">The share relations of the object, or <see langword="null"/>.</param>
         /// <param name="watchers">The watch relations of the object, or <see langword="null"/>.</param>
         /// <param name="comments">The comments of the object, or <see langword="null"/> to omit.</param>
+        /// <param name="viewer">The viewer the timeline is narrowed for.</param>
         /// <param name="relations">The projected relations, or <see langword="null"/> to omit.</param>
         /// <returns>The issue projection.</returns>
         private static Issue BuildIssue
@@ -1188,6 +1380,7 @@ namespace KleeneStar.Portal.WebManager
             IReadOnlyList<ObjectShare> shares,
             IReadOnlyList<ObjectWatcher> watchers,
             IReadOnlyList<Comment> comments,
+            Viewer viewer,
             IReadOnlyList<IssueRelation> relations = null
         )
         {
@@ -1203,14 +1396,14 @@ namespace KleeneStar.Portal.WebManager
                 .Where(p => p is not null)
                 .ToList();
 
-            // the portal timeline is visibility-filtered (concept §Portal Manager); the
-            // operator-side thread is not, so the filter belongs here rather than in the
-            // comment manager
+            // the portal timeline is narrowed by the same audience rule as the operator
+            // thread: the service team's notes reach the service team, never the customer
+            var audience = comments is null ? default : CommentAudienceOf(entity, viewer);
             var timeline = comments is null
                 ? []
                 : comments
                     .Where(c => c.State != CommentState.Deleted)
-                    .Where(c => IsVisibleToViewer(c, entity, FallbackIdentityId))
+                    .Where(c => CommentAudience.Reaches(c, audience.SeesInternal))
                     .OrderBy(c => c.Created)
                     .Select(c => ToIssueComment(c, requester))
                     .ToList();
@@ -1229,6 +1422,7 @@ namespace KleeneStar.Portal.WebManager
                 Requester = requester,
                 AssigneeLabel = assignee?.Name ?? entity.Workspace?.Name ?? string.Empty,
                 RequiresApproval = false,
+                Restricted = entity.PortalRestricted,
                 Created = entity.Created,
                 Updated = entity.Updated,
                 SharedWith = sharedWith,
@@ -1236,6 +1430,22 @@ namespace KleeneStar.Portal.WebManager
                 Comments = timeline,
                 Relations = relations ?? []
             };
+        }
+
+        /// <summary>
+        /// Answers what the viewer may do with the notes of an issue.
+        /// </summary>
+        /// <param name="entity">The issue's object.</param>
+        /// <param name="viewer">The viewer.</param>
+        /// <returns>Whether internal notes reach the viewer, and whether the viewer may write one.</returns>
+        private static (bool SeesInternal, bool MayWriteInternal) CommentAudienceOf(ObjectEntity entity, Viewer viewer)
+        {
+            if (viewer.IsSystem)
+            {
+                return (true, true);
+            }
+
+            return (CommentAudience.SeesInternal(entity, viewer.Id), CommentAudience.MayWriteInternal(entity));
         }
 
         /// <summary>
@@ -1483,12 +1693,20 @@ namespace KleeneStar.Portal.WebManager
         /// <param name="objectId">The object id.</param>
         /// <param name="text">The narration text.</param>
         /// <param name="timestamp">The timestamp of the event.</param>
-        private static void AddSystemComment(Guid objectId, string text, DateTime timestamp)
+        /// <param name="viewer">The acting viewer, whose name the narration carries.</param>
+        private static void AddSystemComment(Guid objectId, string text, DateTime timestamp, Viewer viewer)
         {
+            // a narration is still somebody's act; without anybody to name it is not written,
+            // rather than signed with an account that did not act
+            if (viewer.Id == Guid.Empty)
+            {
+                return;
+            }
+
             CoreHub.CommentManager.Add(new Comment
             {
                 ObjectId = objectId,
-                AuthorId = FallbackIdentityId,
+                AuthorId = viewer.Id,
                 Content = text,
                 State = CommentState.Active,
 
@@ -1505,10 +1723,20 @@ namespace KleeneStar.Portal.WebManager
         /// </summary>
         /// <param name="entity">The object to touch.</param>
         /// <param name="timestamp">The mutation timestamp.</param>
-        private static void Touch(ObjectEntity entity, DateTime timestamp)
+        /// <param name="viewer">The acting viewer.</param>
+        private static void Touch(ObjectEntity entity, DateTime timestamp, Viewer viewer)
         {
             entity.Updated = timestamp;
-            entity.UpdaterId = FallbackIdentityId;
+
+            // never write the empty guid into an identity reference: the system acting leaves
+            // the last updater in place
+            if (viewer.Id != Guid.Empty)
+            {
+                entity.UpdaterId = viewer.Id;
+            }
+
+            using var unrestricted = CoreHub.SecurityLevelManager?.BeginUnrestricted();
+
             CoreHub.ObjectManager.Update(entity);
         }
 
@@ -1575,60 +1803,21 @@ namespace KleeneStar.Portal.WebManager
         }
 
         /// <summary>
-        /// Determines whether a comment reaches a portal viewer.
-        /// </summary>
-        /// <remarks>
-        /// A <see cref="CommentVisibility.Public"/> comment reaches everyone who can open
-        /// the issue. A <see cref="CommentVisibility.InternalTeam"/> comment reaches the
-        /// assigned service group plus the requester (concept §Issue Detail): the object's
-        /// creator, its assignee, and the comment's own author. Identities the issue was
-        /// merely shared with, and watchers, do not see it.
-        /// <para>
-        /// The viewer is <see cref="FallbackIdentityId"/> until the WebExpress identity flow
-        /// exposes the authenticated identity on the request — the same stand-in every other
-        /// portal action uses.
-        /// </para>
-        /// </remarks>
-        /// <param name="comment">The comment to test.</param>
-        /// <param name="entity">The object the comment hangs on.</param>
-        /// <param name="viewerId">The identity reading the timeline.</param>
-        /// <returns><see langword="true"/> when the comment reaches the viewer.</returns>
-        private static bool IsVisibleToViewer(Comment comment, ObjectEntity entity, Guid viewerId)
-        {
-            if (comment.Visibility != CommentVisibility.InternalTeam)
-            {
-                return true;
-            }
-
-            return entity.CreatorId == viewerId
-                || entity.AssigneeId == viewerId
-                || comment.AuthorId == viewerId;
-        }
-
-        /// <summary>
-        /// Allocates the next issue key inside the workspace by incrementing the highest
-        /// numeric key suffix (<c>SD-17</c> → <c>SD-18</c>). Callers must hold
-        /// <see cref="_gate"/>.
+        /// Builds the key of a new issue in a workspace that carries no key of its own, so the
+        /// operator-side numbering has no prefix to count under.
         /// </summary>
         /// <param name="workspace">The workspace the issue is created in.</param>
         /// <returns>The allocated key.</returns>
-        private static string NextKey(Workspace workspace)
+        private static string NextFallbackKey(Workspace workspace)
         {
-            var prefix = string.IsNullOrWhiteSpace(workspace?.Key) ? "ISSUE" : workspace.Key;
-
-            var existing = CoreHub.ObjectManager
-                .GetObjects(new Query<ObjectEntity>().WhereEquals(x => x.WorkspaceId, workspace?.Id ?? Guid.Empty))
+            var existing = ReadObjects(new Query<ObjectEntity>().WhereEquals(x => x.WorkspaceId, workspace?.Id ?? Guid.Empty))
                 .Select(o => o.Key)
-                .Where(k => !string.IsNullOrWhiteSpace(k))
-                .Select(k =>
-                {
-                    var separator = k.LastIndexOf('-');
-                    return separator >= 0 && int.TryParse(k[(separator + 1)..], out var n) ? n : 0;
-                })
+                .Where(k => !string.IsNullOrWhiteSpace(k) && k.StartsWith("ISSUE-", StringComparison.OrdinalIgnoreCase))
+                .Select(k => int.TryParse(k["ISSUE-".Length..], out var n) ? n : 0)
                 .DefaultIfEmpty(0)
                 .Max();
 
-            return $"{prefix}-{existing + 1}";
+            return $"ISSUE-{existing + 1}";
         }
 
         /// <summary>
@@ -1673,6 +1862,220 @@ namespace KleeneStar.Portal.WebManager
             }
 
             return new string([.. chars]);
+        }
+
+        /// <summary>
+        /// What a viewer may do with an issue, by the role they have in it.
+        /// </summary>
+        private enum IssueAccess
+        {
+            /// <summary>The viewer does not see the issue.</summary>
+            None,
+
+            /// <summary>A member of the requester's organization; reads and comments.</summary>
+            Organization,
+
+            /// <summary>An identity the issue was shared with; reads, comments and shares.</summary>
+            Participant,
+
+            /// <summary>The requester; everything the portal offers.</summary>
+            Requester,
+
+            /// <summary>An operator-side account the operator side lets read the object.</summary>
+            ServiceTeam,
+
+            /// <summary>Nobody acting - start-up and background work - which sees everything.</summary>
+            System
+        }
+
+        /// <summary>
+        /// The caller a portal use case answers for, with what the access rule needs to know
+        /// about them resolved once.
+        /// </summary>
+        private sealed class Viewer
+        {
+            /// <summary>
+            /// The tenant of every requester asked about so far.
+            /// </summary>
+            private readonly Dictionary<Guid, Guid?> _tenants = [];
+
+            /// <summary>
+            /// The workspaces serving the viewer's tenant, resolved on first use.
+            /// </summary>
+            private HashSet<Guid> _served;
+
+            /// <summary>
+            /// Gets the viewer standing for the system: nobody acting.
+            /// </summary>
+            public static Viewer System { get; } = new() { IsSystem = true };
+
+            /// <summary>
+            /// Gets the identity of the viewer, <see cref="Guid.Empty"/> for an anonymous one.
+            /// </summary>
+            public Guid Id { get; private init; }
+
+            /// <summary>
+            /// Gets the tenant of the viewer, or <see langword="null"/> for an operator-side
+            /// account.
+            /// </summary>
+            public Guid? TenantId { get; private init; }
+
+            /// <summary>
+            /// Gets a value indicating whether nobody acts and the system sees everything.
+            /// </summary>
+            public bool IsSystem { get; private init; }
+
+            /// <summary>
+            /// Gets a value indicating whether the viewer is a signed-in operator-side account.
+            /// </summary>
+            public bool IsOperator => !IsSystem && Id != Guid.Empty && TenantId is null;
+
+            /// <summary>
+            /// Resolves the viewer of a use case.
+            /// </summary>
+            /// <param name="callerId">The identity the caller named, or <see langword="null"/>
+            /// for the identity acting on this call chain.</param>
+            /// <returns>The viewer.</returns>
+            public static Viewer Resolve(Guid? callerId)
+            {
+                if (callerId is null && CoreHub.SessionManager?.HasCaller != true)
+                {
+                    return System;
+                }
+
+                var id = callerId ?? Caller;
+                var identity = id == Guid.Empty ? null : CoreHub.IdentityManager.GetIdentity(id);
+
+                // an account that is locked or unknown is nobody: the session resolves such a
+                // caller to the empty guid already, a caller-supplied id has to be checked here
+                if (identity is null || identity.State != IdentityState.Active)
+                {
+                    return new Viewer();
+                }
+
+                return new Viewer { Id = id, TenantId = identity.TenantId };
+            }
+
+            /// <summary>
+            /// Determines whether the viewer is offered the request types of a class: the
+            /// class's workspace serves the viewer's tenant, or the viewer is an operator-side
+            /// account. An anonymous viewer is offered nothing.
+            /// </summary>
+            /// <param name="cls">The portal-visible class.</param>
+            /// <returns><see langword="true"/> when the class is offered.</returns>
+            public bool Offers(Class cls)
+            {
+                if (IsSystem || IsOperator)
+                {
+                    return true;
+                }
+
+                return Id != Guid.Empty && Served().Contains(cls.WorkspaceId);
+            }
+
+            /// <summary>
+            /// Answers the viewer's access to an issue.
+            /// </summary>
+            /// <param name="entity">The issue's object, read without the operator-side narrowing.</param>
+            /// <param name="shares">The shares of the object, or <see langword="null"/>.</param>
+            /// <param name="operatorReadable">The ids an operator-side viewer may read in the
+            /// object's class, computed once for a list; <see langword="null"/> to ask the object
+            /// manager for this one object.</param>
+            /// <returns>The access.</returns>
+            public IssueAccess AccessTo(ObjectEntity entity, IReadOnlyCollection<ObjectShare> shares, IReadOnlySet<Guid> operatorReadable)
+            {
+                if (IsSystem)
+                {
+                    return IssueAccess.System;
+                }
+
+                if (Id == Guid.Empty || entity is null)
+                {
+                    return IssueAccess.None;
+                }
+
+                if (entity.CreatorId == Id)
+                {
+                    return IssueAccess.Requester;
+                }
+
+                if (shares?.Any(s => s.IdentityId == Id) == true)
+                {
+                    return IssueAccess.Participant;
+                }
+
+                if (TenantId is Guid tenantId)
+                {
+                    var organization = !entity.PortalRestricted
+                        && Served().Contains(entity.WorkspaceId)
+                        && TenantOf(entity.CreatorId) == tenantId
+                        && CoreHub.SecurityLevelManager?.IsCleared(Id, entity.SecurityLevelId) != false;
+
+                    return organization ? IssueAccess.Organization : IssueAccess.None;
+                }
+
+                // an operator-side account sees what the operator side lets it read - its
+                // workspace grants and its clearance
+                var readable = operatorReadable is not null
+                    ? operatorReadable.Contains(entity.Id)
+                    : CoreHub.ObjectManager.GetObject(entity.Id) is not null;
+
+                return readable ? IssueAccess.ServiceTeam : IssueAccess.None;
+            }
+
+            /// <summary>
+            /// Returns the ids of the objects of a class the operator side lets the viewer read.
+            /// </summary>
+            /// <param name="classId">The class.</param>
+            /// <returns>The readable ids.</returns>
+            public IReadOnlySet<Guid> ReadableIds(Guid classId)
+            {
+                return CoreHub.ObjectManager
+                    .GetObjects(new Query<ObjectEntity>().WhereEquals(x => x.ClassId, classId))
+                    .Select(x => x.Id)
+                    .ToHashSet();
+            }
+
+            /// <summary>
+            /// Returns the tenant of a requester.
+            /// </summary>
+            /// <param name="identityId">The requester, or <see langword="null"/>.</param>
+            /// <returns>The tenant, or <see langword="null"/>.</returns>
+            public Guid? TenantOf(Guid? identityId)
+            {
+                if (identityId is not Guid id)
+                {
+                    return null;
+                }
+
+                if (!_tenants.TryGetValue(id, out var tenant))
+                {
+                    tenant = CoreHub.IdentityManager.GetIdentity(id)?.TenantId;
+                    _tenants[id] = tenant;
+                }
+
+                return tenant;
+            }
+
+            /// <summary>
+            /// Returns the workspaces serving the viewer's tenant.
+            /// </summary>
+            /// <returns>The workspace ids; empty for a viewer without a tenant.</returns>
+            private HashSet<Guid> Served()
+            {
+                if (_served is not null)
+                {
+                    return _served;
+                }
+
+                _served = TenantId is Guid tenantId
+                    ? [.. ReadWorkspaces()
+                        .Where(w => w.Tenants != null && w.Tenants.Any(t => t.Id == tenantId))
+                        .Select(w => w.Id)]
+                    : [];
+
+                return _served;
+            }
         }
 
         /// <summary>

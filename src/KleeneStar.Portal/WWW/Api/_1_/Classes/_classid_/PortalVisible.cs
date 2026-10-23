@@ -14,7 +14,6 @@ namespace KleeneStar.Portal.WWW.Api._1_.Classes._classid_
     /// from the current one.
     /// </summary>
     [Title("kleenestar.portal:api.admin.class.portalvisible.title")]
-    [ClassIdSegment]
     [Cache]
     public sealed class PortalVisible : IRestApi
     {
@@ -39,6 +38,11 @@ namespace KleeneStar.Portal.WWW.Api._1_.Classes._classid_
             if (classIdParameter is null || !Guid.TryParse(classIdParameter.Value, out var classId))
             {
                 return PortalAdminApi.BadRequest("Invalid class id.");
+            }
+
+            if (!PortalAdminApi.MayAdminister(classId, request))
+            {
+                return PortalAdminApi.Forbidden();
             }
 
             var cls = _portalManager.TogglePortalVisible(classId);

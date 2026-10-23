@@ -19,7 +19,6 @@ namespace KleeneStar.Portal.WWW.Workspaces._workspacekey_.Classes
     /// <see cref="WorkspaceKeySegmentAttribute"/>.
     /// </summary>
     [WebIcon<RequestTypeIcon>]
-    [WorkspaceKeySegment]
     [Scope<IScopePortal>]
     [Cache]
     public sealed class Index : IPage<VisualTreeWebApp>, IScopePortal
@@ -57,6 +56,8 @@ namespace KleeneStar.Portal.WWW.Workspaces._workspacekey_.Classes
         /// <param name="visualTree">The visual tree of the web application.</param>
         public void Process(IRenderContext renderContext, VisualTreeWebApp visualTree)
         {
+            global::KleeneStar.Portal.WebPermission.PortalAdminAuthorization.Demand(renderContext.Request);
+
             var keyParameter = renderContext.Request.GetParameter<WorkspaceKeyParameter>();
             var workspace = _portalManager.GetWorkspace(keyParameter?.Value);
 

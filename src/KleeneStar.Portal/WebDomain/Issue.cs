@@ -41,6 +41,9 @@ namespace KleeneStar.Portal.WebDomain
         public bool RequiresApproval { get; init; }
 
         /// <inheritdoc/>
+        public bool Restricted { get; init; }
+
+        /// <inheritdoc/>
         public DateTime Created { get; init; }
 
         /// <inheritdoc/>

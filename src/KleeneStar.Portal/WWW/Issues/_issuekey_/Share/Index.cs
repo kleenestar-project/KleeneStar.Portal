@@ -1,4 +1,3 @@
-using KleeneStar.Portal.WebAttribute;
 using KleeneStar.Portal.WebDomain;
 using KleeneStar.Portal.WebIcon;
 using KleeneStar.Portal.WebManager;
@@ -26,7 +25,6 @@ namespace KleeneStar.Portal.WWW.Issues._issuekey_.Share
     /// <c>WWW/Issues/_issuekey_/Index.cs</c>).
     /// </remarks>
     [WebIcon<IssueIcon>]
-    [IssueKeySegment]
     [Scope<IScopePortal>]
     public sealed class Index : IPage<VisualTreeWebApp>, IScopePortal
     {

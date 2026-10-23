@@ -105,22 +105,28 @@ namespace KleeneStar.Portal.WWW.Api._1_.Issues
                 return PortalApi.Error("'requestTypeKey' and 'title' are required.");
             }
 
-            try
+            return PortalApi.RunWithConflictMapping(() =>
             {
-                var issue = _portalManager.CreateIssue(
-                    payload.RequestTypeKey,
-                    payload.TemplateKey,
-                    payload.Title,
-                    payload.Description,
-                    payload.Priority);
+                try
+                {
+                    var issue = _portalManager.CreateIssue(
+                        payload.RequestTypeKey,
+                        payload.TemplateKey,
+                        payload.Title,
+                        payload.Description,
+                        payload.Priority,
+                        payload.Restricted == true
+                            || string.Equals(payload.Audience, "participants", StringComparison.OrdinalIgnoreCase));
 
-                return PortalApi.Created(PortalApi.ToDto(issue, includeTimeline: true));
-            }
-            catch (InvalidOperationException)
-            {
-                // the manager reports an unknown request type this way
-                return PortalApi.NotFound();
-            }
+                    return PortalApi.Created(PortalApi.ToDto(issue, includeTimeline: true));
+                }
+                catch (InvalidOperationException)
+                {
+                    // the manager reports an unknown request type - or one the caller is not
+                    // offered - this way
+                    return PortalApi.NotFound();
+                }
+            });
         }
 
         /// <summary>
@@ -142,6 +148,15 @@ namespace KleeneStar.Portal.WWW.Api._1_.Issues
 
             /// <summary>Gets or sets the priority code (<c>P1</c>–<c>P4</c>).</summary>
             public string Priority { get; set; }
+
+            /// <summary>Gets or sets whether the issue is kept to its participants.</summary>
+            public bool? Restricted { get; set; }
+
+            /// <summary>
+            /// Gets or sets the audience the portal's create form submits:
+            /// <c>organization</c> or <c>participants</c>.
+            /// </summary>
+            public string Audience { get; set; }
         }
     }
 }
