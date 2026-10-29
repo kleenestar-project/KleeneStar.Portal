@@ -16,10 +16,6 @@
 		<EmbeddedResource Include="Assets/**/*.*">
 			<LogicalName>$(MSBuildProjectName).Assets.%(RecursiveDir)%(Filename)%(Extension)</LogicalName>
 		</EmbeddedResource>
-		<!-- the session renewal script is the core's; the portal serves the same file among its own assets -->
-		<EmbeddedResource Include="..\..\..\KleeneStar.Core\src\KleeneStar.Core\Assets\js\sessionrefresh.js" Link="Assets\js\sessionrefresh.js">
-			<LogicalName>$(MSBuildProjectName).Assets.js\sessionrefresh.js</LogicalName>
-		</EmbeddedResource>
 	</ItemGroup>
 
 	<ItemGroup>
