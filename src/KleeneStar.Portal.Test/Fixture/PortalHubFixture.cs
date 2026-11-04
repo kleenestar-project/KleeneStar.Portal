@@ -55,6 +55,7 @@ namespace KleeneStar.Portal.Test
             ("_objectViewManager",typeof(ObjectViewManager)),
             ("_objectRelationManager",typeof(ObjectRelationManager)),
             ("_objectImpactManager",  typeof(ObjectImpactManager)),
+            ("_objectOperationManager", typeof(ObjectOperationManager)),
             ("_objectProgressManager",typeof(ObjectProgressManager)),
             ("_blueprintManager",   typeof(BlueprintManager)),
             ("_automationManager",  typeof(AutomationManager)),
