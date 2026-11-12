@@ -63,6 +63,10 @@ org.headline=Issues in the organization
 # Request type tiles
 request-type.templates.count={0} templates
 
+# Default theme
+theme.light.description=The framework's own colours, light or dark - the portal's default.
+theme.light.name=Light
+
 # Request type / template picker
 types.picker.blank=Blank request
 types.picker.blank.hint=Start without a template and fill in everything yourself.

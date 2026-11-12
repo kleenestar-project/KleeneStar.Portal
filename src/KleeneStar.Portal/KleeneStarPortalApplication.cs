@@ -1,3 +1,5 @@
+using KleeneStar.Core.WebTheme;
+using KleeneStar.Portal.WebTheme;
 using WebExpress.WebCore;
 using WebExpress.WebCore.WebApplication;
 using WebExpress.WebCore.WebAttribute;
@@ -16,6 +18,7 @@ namespace KleeneStar.Portal
     [Description("kleenestar.portal:app.description")]
     [Icon("/assets/img/kleenestar.svg")]
     [ContextPath("/portal")]
+    [Theme<PortalLightTheme>]
     public sealed class KleeneStarPortalApplication : IApplication
     {
         /// <summary>
@@ -29,6 +32,10 @@ namespace KleeneStar.Portal
             PortalHub.HttpServerContext = httpServerContext;
             PortalHub.ComponentHub = componentHub;
             PortalHub.ApplicationContext = applicationContext;
+
+            // the reader's theme, mode and adjustments - the same record the operator side
+            // keeps, offered through the portal's own endpoints
+            AppearanceRegistration.Register<WWW.Api._1_.Appearance.Theme, WWW.Api._1_.Appearance.Scheme>(applicationContext);
         }
 
         /// <summary>
@@ -47,6 +54,7 @@ namespace KleeneStar.Portal
         /// </summary>
         public void Dispose()
         {
+            AppearanceRegistration.Remove(PortalHub.ApplicationContext);
         }
     }
 }

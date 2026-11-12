@@ -53,6 +53,7 @@ namespace KleeneStar.Portal.Test
             ("_shareManager",     typeof(ShareManager)),
             ("_objectTagManager", typeof(ObjectTagManager)),
             ("_objectDraftManager", typeof(ObjectDraftManager)),
+            ("_appearanceManager", typeof(AppearanceManager)),
             ("_valueManager",     typeof(ValueManager)),
             ("_commitManager",    typeof(CommitManager)),
             ("_templateManager",  typeof(TemplateManager)),

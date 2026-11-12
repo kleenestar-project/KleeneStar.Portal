@@ -63,6 +63,10 @@ org.headline=Vorgänge in der Organisation
 # Request type tiles
 request-type.templates.count={0} Vorlagen
 
+# Default theme
+theme.light.description=Die Farben des Frameworks, hell oder dunkel - der Standard des Portals.
+theme.light.name=Hell
+
 # Request type / template picker
 types.picker.blank=Leere Anfrage
 types.picker.blank.hint=Ohne Vorlage starten und alles selbst ausfüllen.
