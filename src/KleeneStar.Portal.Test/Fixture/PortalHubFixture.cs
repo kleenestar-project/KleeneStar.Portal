@@ -41,6 +41,7 @@ namespace KleeneStar.Portal.Test
             ("_objectRendererManager", typeof(ObjectRendererManager)),
             ("_authenticationSourceManager", typeof(AuthenticationSourceManager)),
             ("_insightViewTypeManager", typeof(InsightViewTypeManager)),
+            ("_objectExportManager", typeof(ObjectExportManager)),
             ("_customQuickfilterManager", typeof(CustomQuickfilterManager)),
             ("_permissionManager", typeof(PermissionManager)),
             ("_identityManager",  typeof(IdentityManager)),
