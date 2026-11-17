@@ -18,7 +18,7 @@ namespace KleeneStar.Portal.WebFragment
     /// </summary>
     [Section<SectionAppAvatarPrimary>]
     [Scope<IScopePortal>]
-    [Condition<global::KleeneStar.Core.WebIdentity.SignedInCondition>]
+    [Condition<global::WebExpress.WebApp.WebCondition.ConditionLogin>]
     [Cache]
     public sealed class PortalProfileLinkFragment : FragmentControlDropdownItemLink
     {
