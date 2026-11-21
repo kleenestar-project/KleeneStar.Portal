@@ -59,6 +59,7 @@ namespace KleeneStar.Portal.Test
             ("_valueManager",     typeof(ValueManager)),
             ("_commitManager",    typeof(CommitManager)),
             ("_templateManager",  typeof(TemplateManager)),
+            ("_templateHierarchyManager", typeof(TemplateHierarchyManager)),
             ("_objectViewManager",typeof(ObjectViewManager)),
             ("_objectRelationManager",typeof(ObjectRelationManager)),
             ("_objectImpactManager",  typeof(ObjectImpactManager)),
