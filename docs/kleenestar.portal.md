@@ -4,7 +4,7 @@
 
 This document specifies the **Customer Portal** of the **KleeneStar** ecosystem. The portal is the public-facing counterpart to the internal **KleeneStar** WebApp: while the WebApp is the operator surface for service teams, administrators, and content modelers, the portal is the surface through which an organization's end users interact with the modeled content. End users in this context are not employees of the operator, but employees of the **tenants** (e.g., the IT-customer, the requesting business unit, an external contractor).
 
-The portal exposes a deliberately reduced subset of **KleeneStar** to this audience. Internal classes, fields, workflows, and dashboards are not directly visible; instead, the portal presents pre-curated **request types** (e.g., "report incident", "request access"), pre-defined **templates**, and a personalized list of **issues** (a domain-specific name for objects that arose from a portal submission) the user has created, has access to, or has been invited to. The portal therefore acts as a controlled projection of the underlying object model — every interaction it offers maps to operations defined in `kleenestar.class.md`, `kleenestar.workflow.md`, `kleenestar.form.md`, and `kleenestar.object.md`, but constrained by tenant scope, identity context, and the active permissions profile.
+The portal exposes a deliberately reduced subset of **KleeneStar** to this audience. Internal classes, fields, workflows, and insights are not directly visible; instead, the portal presents pre-curated **request types** (e.g., "report incident", "request access"), pre-defined **templates**, and a personalized list of **issues** (a domain-specific name for objects that arose from a portal submission) the user has created, has access to, or has been invited to. The portal therefore acts as a controlled projection of the underlying object model — every interaction it offers maps to operations defined in `kleenestar.class.md`, `kleenestar.workflow.md`, `kleenestar.form.md`, and `kleenestar.object.md`, but constrained by tenant scope, identity context, and the active permissions profile.
 
 The portal is a self-contained WebExpress application (`KleeneStar.Portal`) that runs alongside the operator WebApp inside the same host. It shares the data layer (`KleeneStarDbContext`), the manager hub (`CoreHub` / `ModelHub`), and the identity model with the WebApp, but ships its own pages, navigation shell, and theme. This separation allows the operator surface and the customer surface to evolve and to be branded independently while remaining a single source of truth for the data they share.
 
@@ -60,6 +60,8 @@ The portal additionally relies on two relationship concepts that are layered on 
 
 - **Sharing**: An explicit `Link` between an `Object` (the issue) and an `Identity` (a user from the same tenant) that grants the linked identity read/comment access to the issue without making them the requester. Shared identities appear in the issue's "Shared with" panel.
 - **Watching**: A subscription `Link` between an `Identity` and an `Object`. Watchers receive notifications on relevant state and comment events but do not gain additional read rights beyond what their group profile already permits.
+
+Beside these, the issue detail shows the **relations** of the underlying object (`ObjectRelation`, see `KleeneStar.Core/docs/kleenestar.relation.md`) under *Related issues*: caption as read from this issue's side (the inverse label where it is the target), the far end's key and title linked to its portal page, and its collapsed state. The projection is deliberately narrow - a relation is shown only when its far end is itself a portal issue the caller could open by key (a portal-visible class, read through `ObjectManager` so security levels apply). Links to internal records, to external addresses and obsolete relations stay on the operator side. The portal only reads relations; creating and removing them remains an operator action. `GET /api/1/issues/{issuekey}` carries the same list as `relations`, with the caption as stored (an i18n key for a seeded type).
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════════════════╗
@@ -385,7 +387,7 @@ Opening an issue slides a right-hand drawer over the current list, preserving na
 
 When the issue is in the `Resolved` state, a banner at the top of the conversation invites the requester to **accept the resolution** (which closes the issue) or **reject** it (which sends it back to *In Progress* with a mandatory reason). System entries (status changes, share events, watch events, resolution events) are styled distinctly so they read as machine narration, not as human messages.
 
-The composer below the timeline supports two visibilities: *Public* — the default — produces a comment visible to the requester, the service team, and everyone the issue is shared with. *Service team only* is offered as a courtesy when the underlying class permits it and limits a comment to the assigned service group plus the requester. `⌘+Enter` submits.
+The composer below the timeline supports two visibilities: *Public* — the default — produces a comment visible to the requester, the service team, and everyone the issue is shared with. *Service team only* is offered to the service team alone (an operator-side account opening the issue in the portal) and limits a comment to the service team: a customer — the requester included — never reads it and cannot write one (`CommentAudience`, see `KleeneStar.Core/docs/kleenestar.comment.md`). `⌘+Enter` submits.
 
 ```
 ╔PortalShell═══════════════════════════════════════════════════════════════════════════╗
@@ -522,6 +524,31 @@ The event payload includes:
 - A type-specific delta (e.g., the previous and new state for `IssueUpdated`, the affected identities for `IssueShared`)
 
 ## Permissions Model
+
+### As implemented (2026-10-22)
+
+**Who acts is the session's caller.** Every use case of `PortalManager` answers for the identity `ISessionManager.GetCurrentIdentityId` names on the call chain — the signed-in user of the request, or a `BeginIdentity` scope. There is no stand-in identity any more (the portal used to act as the seeded administrator, `FallbackIdentityId`): an anonymous caller is offered no request type, sees no issue and changes nothing, and every comment, share, watch and resolution decision is the caller's. Only with nobody acting at all (start-up, background work) does the manager answer as the system.
+
+**The portal has its own access rule** (`PortalManager.IssueAccess`), because the operator side's workspace grants are no answer here: a customer is not given read access to a service desk, yet must see the request they filed in it. The portal therefore reads the objects without the operator-side narrowing and applies, per issue:
+
+|Access         |Who                                                                                     |May
+|---------------|----------------------------------------------------------------------------------------|------------------------------------------------
+|`Requester`    |The creator of the object.                                                              |Everything: read, comment, share, revoke any share, watch, restrict, accept/reject.
+|`Participant`  |An identity the issue was shared with.                                                  |Read, comment, share further, leave (revoke their own share), watch.
+|`Organization` |A member of the requester's tenant, while the workspace serves that tenant, the issue is not restricted, and the security level clears them.|Read, comment, watch.
+|`ServiceTeam`  |An operator-side account (no tenant) the operator side lets read the object (grants and clearance).|Read, comment (internal notes too), watch, restrict when it may update the object.
+|`None`         |Everybody else.                                                                         |Nothing — the issue is answered as *not found*, so a guessed key discloses nothing.
+
+- **The organization is the requester's tenant**, not every tenant the workspace serves: a service desk serving two customers does not show one customer's requests to the other (it used to — the organization scope listed every issue of every workspace shared with the caller's tenant).
+- **Request types** are offered for the workspaces serving the caller's tenant (every one to an operator-side account); a customer cannot file into another service desk, not even by a hand-made request.
+- **Restricting an issue to its participants** (`Object.PortalRestricted`) takes it out of the organization scope — for a request about a person. The requester chooses it when submitting (*Visible to: my organization / only me and the people I share it with*) and changes it later on `/issues/{key}/visibility`; the change is recorded in the object's history.
+- **Internal notes** never reach a customer (see the composer above).
+- The **administration** pages and endpoints (workspaces, classes, fields, forms, priorities, statuses, the publish toggles) demand the operator side's class administration on the route's chain (`PortalAdminAuthorization`, `PortalAdminApi.MayAdminister`); they used to answer anybody. The navigation entry is shown to operator-side accounts only (`OperatorCondition`).
+- REST: an issue the caller may not see is `404`; an action the caller may not take on an issue they see is `403` (`PortalForbiddenException`); `POST|DELETE /api/1/issues/{key}/restrict` sets the audience.
+
+The `portal_*` permissions below are the concept's target model; they are not evaluated yet — tenancy, participation and the operator-side grants are what decides today.
+
+### Concept
 
 The portal applies the **KleeneStar** permissions model context-specifically. Group memberships and policies are global; their effect on a portal interaction is mediated by the workspace profile attached to the request type's underlying class and by the issue-local sharing record.
 

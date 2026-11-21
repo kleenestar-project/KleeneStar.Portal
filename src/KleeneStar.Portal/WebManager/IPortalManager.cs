@@ -54,9 +54,8 @@ namespace KleeneStar.Portal.WebManager
         event EventHandler<IIssue> IssueClosed;
 
         /// <summary>
-        /// Gets the participant representing the currently authenticated portal user. The
-        /// reference is provided by the <c>IdentityManager</c> on the operator side; in the
-        /// initial mock implementation a fixed demo identity is returned.
+        /// Gets the participant representing the signed-in portal user - the identity the
+        /// session names on this call chain - or <see langword="null"/> for an anonymous caller.
         /// </summary>
         IssueParticipant CurrentUser { get; }
 
@@ -68,8 +67,25 @@ namespace KleeneStar.Portal.WebManager
         IReadOnlyList<IssueParticipant> GetOrganizationMembers();
 
         /// <summary>
-        /// Returns the request types visible to the calling identity in the active
-        /// workspace/tenant context.
+        /// Gets the directory of the organization <paramref name="callerId"/> belongs to: the
+        /// active identities of the caller's tenant, the caller included, ordered by name.
+        /// </summary>
+        /// <remarks>
+        /// An organization is a tenant. A caller that belongs to none - an operator-side account,
+        /// or an identity the system does not know - has no organization to list and is answered
+        /// with an empty directory, never with everyone: this list is what the share dialog
+        /// offers, and sharing is bounded by the tenant (concept: <i>identities of the same
+        /// tenant</i>).
+        /// </remarks>
+        /// <param name="callerId">The acting identity, or <see langword="null"/> for the identity
+        /// acting on this call chain.</param>
+        /// <returns>The organization members, or an empty list.</returns>
+        IReadOnlyList<IssueParticipant> GetOrganizationMembers(Guid? callerId);
+
+        /// <summary>
+        /// Returns the request types offered to the calling identity: those of the workspaces
+        /// serving its tenant, every one to an operator-side account, none to an anonymous
+        /// caller.
         /// </summary>
         /// <returns>The request-type catalog.</returns>
         IReadOnlyList<IRequestType> GetRequestTypes();
@@ -90,14 +106,14 @@ namespace KleeneStar.Portal.WebManager
 
         /// <summary>
         /// Returns the issues visible to <paramref name="callerId"/> in the requested
-        /// scope. Use this overload from REST endpoints and tests where the calling
-        /// identity is known; production pages pass the authenticated identity
-        /// resolved by the WebExpress session flow.
+        /// scope. <c>Mine</c> holds the issues the caller filed, was shared or watches;
+        /// <c>Organization</c> the issues members of the caller's tenant filed that are not
+        /// restricted to their participants.
         /// </summary>
         /// <param name="scope">The scope filter — <c>Mine</c> or <c>Organization</c>.</param>
         /// <param name="callerId">
-        /// The acting identity, or <see langword="null"/> to fall back to the seeded
-        /// admin (the legacy behavior of the no-caller overload).
+        /// The acting identity, or <see langword="null"/> for the identity acting on this
+        /// call chain (the signed-in user of the request).
         /// </param>
         /// <returns>The list of issues, ordered by most-recently updated first.</returns>
         IReadOnlyList<IIssue> GetIssues(IssueScope scope, Guid? callerId);
@@ -119,10 +135,10 @@ namespace KleeneStar.Portal.WebManager
         IReadOnlyList<Workspace> GetWorkspaces();
 
         /// <summary>
-        /// Returns the workspaces visible to <paramref name="callerId"/>; the
-        /// production-page overload falls back to the seeded admin.
+        /// Returns the workspaces visible to <paramref name="callerId"/>.
         /// </summary>
-        /// <param name="callerId">The acting identity, or <see langword="null"/> for the fallback.</param>
+        /// <param name="callerId">The acting identity, or <see langword="null"/> for the identity
+        /// acting on this call chain.</param>
         /// <returns>The ordered workspace list.</returns>
         IReadOnlyList<Workspace> GetWorkspaces(Guid? callerId);
 
@@ -265,16 +281,38 @@ namespace KleeneStar.Portal.WebManager
         /// <param name="title">The short description of the issue.</param>
         /// <param name="description">The long description / steps to reproduce.</param>
         /// <param name="priority">The priority code (<c>P1</c>–<c>P4</c>).</param>
+        /// <param name="restricted">
+        /// <see langword="true"/> to keep the issue to its participants rather than showing it
+        /// to the requester's organization - for a request about a person.
+        /// </param>
         /// <returns>The freshly persisted issue.</returns>
-        IIssue CreateIssue(string requestTypeKey, string templateKey, string title, string description, string priority);
+        /// <exception cref="PortalForbiddenException">The caller is not signed in.</exception>
+        IIssue CreateIssue(string requestTypeKey, string templateKey, string title, string description, string priority, bool restricted = false);
+
+        /// <summary>
+        /// Restricts an issue to its participants, or opens it to the requester's organization
+        /// again. The requester decides; an operator-side account that may change the object
+        /// may too.
+        /// </summary>
+        /// <param name="issueKey">The issue.</param>
+        /// <param name="restricted"><see langword="true"/> to restrict.</param>
+        /// <returns>The updated issue, or <see langword="null"/> when it is not visible.</returns>
+        /// <exception cref="PortalForbiddenException">The caller may not change the audience.</exception>
+        IIssue SetRestricted(string issueKey, bool restricted);
 
         /// <summary>
         /// Appends a comment to an issue's timeline.
         /// </summary>
         /// <param name="issueKey">The issue to comment on.</param>
         /// <param name="text">The message body.</param>
-        /// <param name="visibility">The visibility flag (<c>public</c> or <c>internal-team</c>).</param>
-        /// <returns>The updated issue.</returns>
+        /// <param name="visibility">
+        /// The visibility flag (<c>public</c> or <c>internal-team</c>). It is persisted on
+        /// the comment and narrows the timeline the portal projects: an
+        /// <c>internal-team</c> comment reaches the service team alone and is written by the
+        /// service team alone (<c>CommentAudience</c>). An unrecognised value reads as
+        /// <c>public</c>.
+        /// </param>
+        /// <returns>The updated issue, whose timeline is filtered for the caller.</returns>
         IIssue AddComment(string issueKey, string text, string visibility);
 
         /// <summary>
@@ -337,5 +375,13 @@ namespace KleeneStar.Portal.WebManager
         /// <param name="objectId">The underlying object id.</param>
         /// <returns>The projected issue when the event was raised, <see langword="null"/> otherwise.</returns>
         IIssue NotifyResolutionProposed(Guid objectId);
+
+        /// <summary>
+        /// Subscribes the portal to the operator-side events it derives its own from: a workflow
+        /// transition that stamps a portal-visible object with a resolved state raises
+        /// <see cref="IssueResolutionProposed"/> through <see cref="NotifyResolutionProposed"/>.
+        /// Called once when the portal application starts; calling it again does nothing.
+        /// </summary>
+        void Connect();
     }
 }

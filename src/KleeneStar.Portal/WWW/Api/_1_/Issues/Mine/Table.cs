@@ -8,7 +8,7 @@ namespace KleeneStar.Portal.WWW.Api._1_.Issues.Mine
     /// <summary>
     /// REST table endpoint backing the "My Issues" view. Returns the calling
     /// identity's issues (scope <c>Mine</c>) in the <c>RestApiTableResult</c> shape the
-    /// <c>ControlRestTable</c> client consumes. The filtering, paging, and shaping is
+    /// <c>ControlDataTable</c> client consumes. The filtering, paging, and shaping is
     /// shared with the organization table via <see cref="IssueTableProjection"/>.
     /// </summary>
     /// <remarks>

@@ -15,7 +15,6 @@ namespace KleeneStar.Portal.WWW.Api._1_.Classes._classid_.Fields._fieldid_
     /// properties.
     /// </summary>
     [Title("kleenestar.portal:api.admin.field.update.title")]
-    [FieldIdSegment]
     [Cache]
     public sealed class Update : IRestApi
     {
@@ -40,6 +39,11 @@ namespace KleeneStar.Portal.WWW.Api._1_.Classes._classid_.Fields._fieldid_
             if (fieldIdParameter is null || !Guid.TryParse(fieldIdParameter.Value, out var fieldId))
             {
                 return PortalAdminApi.BadRequest("Invalid field id.");
+            }
+
+            if (!PortalAdminApi.MayAdministerField(fieldId, request))
+            {
+                return PortalAdminApi.Forbidden();
             }
 
             if (!PortalAdminApi.TryReadBody<FieldPayload>(request, out var payload)

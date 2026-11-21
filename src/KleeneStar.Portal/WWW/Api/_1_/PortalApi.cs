@@ -86,18 +86,15 @@ namespace KleeneStar.Portal.WWW.Api._1_
 
         /// <summary>
         /// Wraps a state conflict (e.g. accepting a resolution that has not been
-        /// proposed) into a JSON <c>422</c> response. The concept document specifies
-        /// <c>409 Conflict</c>; WebExpress 2.0.0-alpha does not ship a dedicated
-        /// conflict response type, so the portal falls back to
-        /// <c>422 Unprocessable Entity</c> and surfaces the conflict reason in the
-        /// <c>error</c> field. When <c>ResponseConflict</c> becomes available in a
-        /// later WebExpress release, this method should switch to it.
+        /// proposed) into a JSON <c>409 Conflict</c> response, the status the concept
+        /// document specifies, and surfaces the conflict reason in the <c>error</c>
+        /// field.
         /// </summary>
         /// <param name="message">The conflict message.</param>
         /// <returns>The response.</returns>
         internal static IResponse Conflict(string message)
         {
-            return new ResponseUnprocessableEntity
+            return new ResponseConflict
             {
                 Content = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { error = message }, JsonOptions))
             }
@@ -105,13 +102,29 @@ namespace KleeneStar.Portal.WWW.Api._1_
         }
 
         /// <summary>
-        /// Runs <paramref name="action"/> and maps a <see cref="KleeneStar.Portal.WebManager.PortalConflictException"/>
-        /// to a <c>409/422</c> response (see <see cref="Conflict"/>). Any other
-        /// exception is allowed to propagate so framework-level error handling
-        /// continues to work.
+        /// Wraps a refusal into a JSON <c>403 Forbidden</c> response: the caller may see the
+        /// issue but may not do what was asked of it.
+        /// </summary>
+        /// <param name="message">The reason of the refusal.</param>
+        /// <returns>The response.</returns>
+        internal static IResponse Forbidden(string message)
+        {
+            return new ResponseForbidden
+            {
+                Content = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { error = message }, JsonOptions))
+            }
+                .AddHeaderContentType("application/json");
+        }
+
+        /// <summary>
+        /// Runs <paramref name="action"/> and maps the manager's refusals to their status: a
+        /// <see cref="KleeneStar.Portal.WebManager.PortalConflictException"/> to <c>409 Conflict</c>
+        /// (see <see cref="Conflict"/>), a <see cref="KleeneStar.Portal.WebManager.PortalForbiddenException"/>
+        /// to <c>403 Forbidden</c>. Any other exception is allowed to propagate so
+        /// framework-level error handling continues to work.
         /// </summary>
         /// <param name="action">The action to execute.</param>
-        /// <returns>The response produced by <paramref name="action"/>, or a conflict response.</returns>
+        /// <returns>The response produced by <paramref name="action"/>, or the refusal.</returns>
         internal static IResponse RunWithConflictMapping(Func<IResponse> action)
         {
             try
@@ -121,6 +134,10 @@ namespace KleeneStar.Portal.WWW.Api._1_
             catch (KleeneStar.Portal.WebManager.PortalConflictException ex)
             {
                 return Conflict(ex.Message);
+            }
+            catch (KleeneStar.Portal.WebManager.PortalForbiddenException ex)
+            {
+                return Forbidden(ex.Message);
             }
         }
 
@@ -217,13 +234,36 @@ namespace KleeneStar.Portal.WWW.Api._1_
                 State = issue.PortalState,
                 Requester = ToDto(issue.Requester),
                 AssigneeLabel = issue.AssigneeLabel,
+                Restricted = issue.Restricted,
                 Created = issue.Created,
                 Updated = issue.Updated,
                 SharedWith = [.. issue.SharedWith.Select(ToDto)],
                 Watchers = [.. issue.Watchers.Select(ToDto)],
                 Comments = includeTimeline
                     ? [.. issue.Comments.Select(ToDto)]
+                    : null,
+                Relations = includeTimeline
+                    ? [.. issue.Relations.Select(ToDto)]
                     : null
+            };
+        }
+
+        /// <summary>
+        /// Projects a relation onto its wire shape.
+        /// </summary>
+        /// <param name="relation">The relation.</param>
+        /// <returns>The DTO.</returns>
+        internal static RelationDto ToDto(IssueRelation relation)
+        {
+            return new RelationDto
+            {
+                Id = relation.Id,
+                Type = relation.TypeKey,
+                Label = relation.Label,
+                Outgoing = relation.IsOutgoing,
+                Key = relation.Key,
+                Title = relation.Title,
+                State = relation.PortalState
             };
         }
 
@@ -349,6 +389,33 @@ namespace KleeneStar.Portal.WWW.Api._1_
         }
 
         /// <summary>
+        /// The wire shape of a relation to another issue.
+        /// </summary>
+        internal sealed class RelationDto
+        {
+            /// <summary>Gets or sets the relation id.</summary>
+            public string Id { get; init; }
+
+            /// <summary>Gets or sets the key of the relation type.</summary>
+            public string Type { get; init; }
+
+            /// <summary>Gets or sets the caption as read from this issue (an i18n key or text).</summary>
+            public string Label { get; init; }
+
+            /// <summary>Gets or sets whether this issue is the source of the relation.</summary>
+            public bool Outgoing { get; init; }
+
+            /// <summary>Gets or sets the key of the related issue.</summary>
+            public string Key { get; init; }
+
+            /// <summary>Gets or sets the title of the related issue.</summary>
+            public string Title { get; init; }
+
+            /// <summary>Gets or sets the collapsed portal state of the related issue.</summary>
+            public PortalIssueState State { get; init; }
+        }
+
+        /// <summary>
         /// The wire shape of an issue.
         /// </summary>
         internal sealed class IssueDto
@@ -380,6 +447,9 @@ namespace KleeneStar.Portal.WWW.Api._1_
             /// <summary>Gets or sets the assigned service label.</summary>
             public string AssigneeLabel { get; init; }
 
+            /// <summary>Gets or sets whether the issue is kept to its participants.</summary>
+            public bool Restricted { get; init; }
+
             /// <summary>Gets or sets the creation timestamp.</summary>
             public DateTime Created { get; init; }
 
@@ -394,6 +464,9 @@ namespace KleeneStar.Portal.WWW.Api._1_
 
             /// <summary>Gets or sets the timeline, or <see langword="null"/> in list projections.</summary>
             public IReadOnlyList<CommentDto> Comments { get; init; }
+
+            /// <summary>Gets or sets the relations to other issues, or <see langword="null"/> in list projections.</summary>
+            public IReadOnlyList<RelationDto> Relations { get; init; }
         }
     }
 }

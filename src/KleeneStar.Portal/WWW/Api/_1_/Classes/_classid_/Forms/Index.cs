@@ -15,7 +15,6 @@ namespace KleeneStar.Portal.WWW.Api._1_.Classes._classid_.Forms
     /// service-request templates.
     /// </summary>
     [Title("kleenestar.portal:api.admin.forms.title")]
-    [ClassIdSegment]
     [Cache]
     public sealed class Index : IRestApi
     {
@@ -45,6 +44,11 @@ namespace KleeneStar.Portal.WWW.Api._1_.Classes._classid_.Forms
             if (_portalManager.GetClass(classId) is null)
             {
                 return PortalAdminApi.NotFound();
+            }
+
+            if (!PortalAdminApi.MayAdminister(classId, request))
+            {
+                return PortalAdminApi.Forbidden();
             }
 
             var payload = _portalManager.GetForms(classId)

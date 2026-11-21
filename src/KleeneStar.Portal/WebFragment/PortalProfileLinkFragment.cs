@@ -1,11 +1,11 @@
 using KleeneStar.Portal.WebScope;
-using WebExpress.WebApp.WebCondition;
 using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebComponent;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
 using WebExpress.WebCore.WebScope;
+using WebExpress.WebCore.WebIcon;
 using WebExpress.WebUI.WebFragment;
 using WebExpress.WebUI.WebIcon;
 using WebExpress.WebUI.WebPage;
@@ -18,7 +18,7 @@ namespace KleeneStar.Portal.WebFragment
     /// </summary>
     [Section<SectionAppAvatarPrimary>]
     [Scope<IScopePortal>]
-    [Condition<ConditionLogin>]
+    [Condition<global::WebExpress.WebApp.WebCondition.ConditionLogin>]
     [Cache]
     public sealed class PortalProfileLinkFragment : FragmentControlDropdownItemLink
     {

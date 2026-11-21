@@ -1,12 +1,11 @@
 using WebExpress.WebApp.WebControl;
+using WebExpress.WebApp.WebData;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
-using WebExpress.WebCore.WebHtml;
 using WebExpress.WebCore.WebIcon;
 using WebExpress.WebUI.WebControl;
 using WebExpress.WebUI.WebFragment;
 using WebExpress.WebUI.WebIcon;
-using WebExpress.WebUI.WebPage;
 using WebExpress.WebUI.WebSection;
 
 namespace KleeneStar.Portal.WebFragment
@@ -23,11 +22,21 @@ namespace KleeneStar.Portal.WebFragment
     public sealed class PortalMineViewTableFragment : FragmentControlViewItem
     {
         /// <summary>
+        /// The stable identifier of the issue table.
+        /// </summary>
+        public const string TableId = "portal-mine-issues-table";
+
+        /// <summary>
+        /// Resource key of the message shown while the view has no matching issues.
+        /// </summary>
+        public const string EmptyResource = "kleenestar.portal:mine.empty";
+
+        /// <summary>
         /// Gets the table that displays the calling identity's issues.
         /// </summary>
-        public ControlRestTable Table { get; } = new ControlRestTable()
+        public ControlDataTable Table { get; } = new ControlDataTable(TableId)
         {
-            RestUri = _ => PortalHub.GetUri<global::KleeneStar.Portal.WWW.Api._1_.Issues.Mine.Table>()
+            ServiceFactory = _ => DataServiceDescriptor.TableData(PortalHub.GetUri<global::KleeneStar.Portal.WWW.Api._1_.Issues.Mine.Table>().ToString())
         };
 
         /// <summary>
@@ -37,7 +46,13 @@ namespace KleeneStar.Portal.WebFragment
         public PortalMineViewTableFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
-            Icon = _ => new IconTable(TypeIconTheme.Light);
+            // the table is the view here rather than a block among others, so it takes the
+            // height it is handed instead of growing with its rows: the rows then scroll under
+            // a column header that stays, and the pager stays in reach below them
+            Table.Fill = _ => true;
+            Table.EmptyText = _ => EmptyResource;
+
+            Icon = _ => new IconTable();
             Title = _ => "kleenestar.core:view.table.title";
             Table.Bind = _ => new Binding()
                 .Add(new BindSearch() { Source = PortalMineViewSearchFragment.ContentId })
@@ -45,17 +60,9 @@ namespace KleeneStar.Portal.WebFragment
                 .Add(new BindPaging() { Source = PortalMineViewPaginationFragment.ContentId });
 
             Add(Table);
+
+
         }
 
-        /// <summary>
-        /// Convert the fragment to HTML.
-        /// </summary>
-        /// <param name="renderContext">The context in which the fragment is rendered.</param>
-        /// <param name="visualTree">The visual tree used for rendering the fragment.</param>
-        /// <returns>An HTML node representing the rendered fragments. Can be null if no nodes are present.</returns>
-        public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
-        {
-            return base.Render(renderContext, visualTree);
-        }
     }
 }

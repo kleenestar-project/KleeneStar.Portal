@@ -1,4 +1,3 @@
-using KleeneStar.Portal.WebAttribute;
 using KleeneStar.Portal.WebDomain;
 using KleeneStar.Portal.WebIcon;
 using KleeneStar.Portal.WebManager;
@@ -21,7 +20,6 @@ namespace KleeneStar.Portal.WWW.Issues._issuekey_.Accept
     /// abbreviates the path to <c>/t/{key}/accept</c>.
     /// </remarks>
     [WebIcon<IssueIcon>]
-    [IssueKeySegment]
     [Scope<IScopePortal>]
     public sealed class Index : IPage<VisualTreeWebApp>, IScopePortal
     {

@@ -13,7 +13,6 @@ namespace KleeneStar.Portal.WWW.Api._1_.Classes._classid_.Fields._fieldid_
     /// is preserved for audit; the field is hidden from portal list projections.
     /// </summary>
     [Title("kleenestar.portal:api.admin.field.delete.title")]
-    [FieldIdSegment]
     [Cache]
     public sealed class Delete : IRestApi
     {
@@ -38,6 +37,11 @@ namespace KleeneStar.Portal.WWW.Api._1_.Classes._classid_.Fields._fieldid_
             if (fieldIdParameter is null || !Guid.TryParse(fieldIdParameter.Value, out var fieldId))
             {
                 return PortalAdminApi.BadRequest("Invalid field id.");
+            }
+
+            if (!PortalAdminApi.MayAdministerField(fieldId, request))
+            {
+                return PortalAdminApi.Forbidden();
             }
 
             var ok = _portalManager.DeleteField(fieldId);

@@ -64,6 +64,13 @@ namespace KleeneStar.Portal.WebDomain
         bool RequiresApproval { get; }
 
         /// <summary>
+        /// Gets a value indicating whether the issue is kept to its participants - the requester
+        /// and the identities it was shared with - instead of being visible to the requester's
+        /// whole organization.
+        /// </summary>
+        bool Restricted { get; }
+
+        /// <summary>
         /// Gets the timestamp at which the issue was created.
         /// </summary>
         DateTime Created { get; }
@@ -87,5 +94,11 @@ namespace KleeneStar.Portal.WebDomain
         /// Gets the conversation timeline (human comments + system notes).
         /// </summary>
         IReadOnlyList<IssueComment> Comments { get; }
+
+        /// <summary>
+        /// Gets the relations to other portal issues the caller may open. Empty in list
+        /// projections.
+        /// </summary>
+        IReadOnlyList<IssueRelation> Relations { get; }
     }
 }

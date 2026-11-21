@@ -1,13 +1,12 @@
+using KleeneStar.Core.WebControl;
 using KleeneStar.Portal.WebDomain;
 using KleeneStar.Portal.WebManager;
 using KleeneStar.Portal.WebParameter;
-using KleeneStar.Portal.WebScope;
 using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
-using WebExpress.WebCore.WebIcon;
 using WebExpress.WebUI.WebControl;
 using WebExpress.WebUI.WebFragment;
 using WebExpress.WebUI.WebPage;
@@ -79,7 +78,7 @@ namespace KleeneStar.Portal.WebFragment
 
             card.Add(new ControlText()
             {
-                Text = _ => requestType.Description,
+                Text = _ => ProseText.ToPlainText(requestType.Description),
                 TextColor = _ => new PropertyColorText(TypeColorText.Secondary)
             });
             card.Add(new ControlText()
@@ -93,11 +92,17 @@ namespace KleeneStar.Portal.WebFragment
         }
 
         /// <summary>
-        /// Convert the fragment to HTML.
+        /// Renders the control as an HTML node.
         /// </summary>
-        /// <param name="renderContext">The context in which the fragment is rendered.</param>
-        /// <param name="visualTree">The visual tree used for rendering the fragment.</param>
-        /// <returns>The rendered HTML node.</returns>
+        /// <param name="renderContext">
+        /// The context in which the control is rendered.
+        /// </param>
+        /// <param name="visualTree">
+        /// The visual tree representing the control's structure.
+        /// </param>
+        /// <returns>
+        /// An HTML node representing the rendered control.
+        /// </returns>
         public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
             return base.Render(renderContext, visualTree);

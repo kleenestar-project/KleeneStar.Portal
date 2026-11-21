@@ -41,6 +41,9 @@ namespace KleeneStar.Portal.WebDomain
         public bool RequiresApproval { get; init; }
 
         /// <inheritdoc/>
+        public bool Restricted { get; init; }
+
+        /// <inheritdoc/>
         public DateTime Created { get; init; }
 
         /// <inheritdoc/>
@@ -54,5 +57,8 @@ namespace KleeneStar.Portal.WebDomain
 
         /// <inheritdoc/>
         public IReadOnlyList<IssueComment> Comments { get; init; } = [];
+
+        /// <inheritdoc/>
+        public IReadOnlyList<IssueRelation> Relations { get; init; } = [];
     }
 }

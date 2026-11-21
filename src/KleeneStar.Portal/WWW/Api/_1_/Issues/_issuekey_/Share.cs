@@ -56,9 +56,12 @@ namespace KleeneStar.Portal.WWW.Api._1_.Issues._issuekey_
                 return PortalApi.Error("'identities' must contain at least one identity id.");
             }
 
-            var issue = _portalManager.ShareIssue(PortalApi.GetIssueKey(request), payload.Identities);
+            return PortalApi.RunWithConflictMapping(() =>
+            {
+                var issue = _portalManager.ShareIssue(PortalApi.GetIssueKey(request), payload.Identities);
 
-            return issue is null ? PortalApi.NotFound() : PortalApi.NoContent();
+                return issue is null ? PortalApi.NotFound() : PortalApi.NoContent();
+            });
         }
 
         /// <summary>
@@ -80,9 +83,12 @@ namespace KleeneStar.Portal.WWW.Api._1_.Issues._issuekey_
                 return PortalApi.Error("The 'identity' query parameter is required.");
             }
 
-            var issue = _portalManager.UnshareIssue(PortalApi.GetIssueKey(request), identity);
+            return PortalApi.RunWithConflictMapping(() =>
+            {
+                var issue = _portalManager.UnshareIssue(PortalApi.GetIssueKey(request), identity);
 
-            return issue is null ? PortalApi.NotFound() : PortalApi.NoContent();
+                return issue is null ? PortalApi.NotFound() : PortalApi.NoContent();
+            });
         }
 
         /// <summary>

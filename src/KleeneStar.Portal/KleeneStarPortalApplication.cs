@@ -1,3 +1,5 @@
+using KleeneStar.Core.WebTheme;
+using KleeneStar.Portal.WebTheme;
 using WebExpress.WebCore;
 using WebExpress.WebCore.WebApplication;
 using WebExpress.WebCore.WebAttribute;
@@ -15,8 +17,8 @@ namespace KleeneStar.Portal
     [Name("kleenestar.portal:app.name")]
     [Description("kleenestar.portal:app.description")]
     [Icon("/assets/img/kleenestar.svg")]
-    [IconTheme(TypeIconTheme.Light)]
     [ContextPath("/portal")]
+    [Theme<PortalLightTheme>]
     public sealed class KleeneStarPortalApplication : IApplication
     {
         /// <summary>
@@ -30,6 +32,10 @@ namespace KleeneStar.Portal
             PortalHub.HttpServerContext = httpServerContext;
             PortalHub.ComponentHub = componentHub;
             PortalHub.ApplicationContext = applicationContext;
+
+            // the reader's theme, mode and adjustments - the same record the operator side
+            // keeps, offered through the portal's own endpoints
+            AppearanceRegistration.Register<WWW.Api._1_.Appearance.Theme, WWW.Api._1_.Appearance.Scheme>(applicationContext);
         }
 
         /// <summary>
@@ -37,6 +43,18 @@ namespace KleeneStar.Portal
         /// </summary>
         public void Run()
         {
+            // the portal derives its own lifecycle events from the operator side's; the
+            // subscription is made here, once every manager of both applications exists
+            PortalHub.PortalManager.Connect();
+        }
+
+        /// <summary>
+        /// Called when the host shuts down. The application holds no resources of its own;
+        /// the database contexts are created and disposed per use.
+        /// </summary>
+        public void Dispose()
+        {
+            AppearanceRegistration.Remove(PortalHub.ApplicationContext);
         }
     }
 }

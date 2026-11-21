@@ -14,7 +14,6 @@ namespace KleeneStar.Portal.WWW.Api._1_.Classes._classid_.Fields
     /// field projection with deprecated fields filtered out.
     /// </summary>
     [Title("kleenestar.portal:api.admin.fields.title")]
-    [ClassIdSegment]
     [Cache]
     public sealed class Index : IRestApi
     {
@@ -44,6 +43,11 @@ namespace KleeneStar.Portal.WWW.Api._1_.Classes._classid_.Fields
             if (_portalManager.GetClass(classId) is null)
             {
                 return PortalAdminApi.NotFound();
+            }
+
+            if (!PortalAdminApi.MayAdminister(classId, request))
+            {
+                return PortalAdminApi.Forbidden();
             }
 
             var payload = _portalManager.GetFields(classId)

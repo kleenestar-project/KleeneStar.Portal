@@ -14,9 +14,8 @@ namespace KleeneStar.Portal.WWW.Api._1_.Issues._issuekey_
     /// </summary>
     /// <remarks>
     /// Accepting is idempotent on closed issues (<c>204</c> with no further effect);
-    /// accepting an issue whose resolution has never been proposed is a state
-    /// conflict (the concept's <c>409</c>, emitted as <c>422</c> — see
-    /// <see cref="PortalApi.Conflict"/>).
+    /// accepting an issue whose resolution has never been proposed is a
+    /// <c>409 Conflict</c> (see <see cref="PortalApi.Conflict"/>).
     /// </remarks>
     [Title("kleenestar.portal:api.issue.accept.title")]
     [Cache]

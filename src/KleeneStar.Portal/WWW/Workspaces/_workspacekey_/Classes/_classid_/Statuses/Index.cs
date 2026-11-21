@@ -1,4 +1,5 @@
 using KleeneStar.Core.WebAttribute;
+using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Portal.WebIcon;
 using KleeneStar.Portal.WebManager;
@@ -16,7 +17,6 @@ namespace KleeneStar.Portal.WWW.Workspaces._workspacekey_.Classes._classid_.Stat
     /// Statuses tab — read-only list of the active statuses of a class.
     /// </summary>
     [WebIcon<RequestTypeIcon>]
-    [ClassIdSegment]
     [Scope<IScopePortal>]
     [Cache]
     public sealed class Index : IPage<VisualTreeWebApp>, IScopePortal
@@ -51,6 +51,8 @@ namespace KleeneStar.Portal.WWW.Workspaces._workspacekey_.Classes._classid_.Stat
         /// <param name="visualTree">The visual tree of the web application.</param>
         public void Process(IRenderContext renderContext, VisualTreeWebApp visualTree)
         {
+            global::KleeneStar.Portal.WebPermission.PortalAdminAuthorization.Demand(renderContext.Request);
+
             var classIdParameter = renderContext.Request.GetParameter<ClassIdParameter>();
             if (classIdParameter is null || !Guid.TryParse(classIdParameter.Value, out var classId)
                 || _portalManager.GetClass(classId) is null)
@@ -86,7 +88,7 @@ namespace KleeneStar.Portal.WWW.Workspaces._workspacekey_.Classes._classid_.Stat
             foreach (var status in statuses)
             {
                 var capturedName = status.Name;
-                var capturedDescription = status.Description ?? string.Empty;
+                var capturedDescription = ProseText.ToPlainText(status.Description) ?? string.Empty;
 
                 table = table.AddRow
                 (

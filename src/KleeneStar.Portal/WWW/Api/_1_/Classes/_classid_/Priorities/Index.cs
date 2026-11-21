@@ -13,7 +13,6 @@ namespace KleeneStar.Portal.WWW.Api._1_.Classes._classid_.Priorities
     /// REST endpoint listing the active priorities of a class.
     /// </summary>
     [Title("kleenestar.portal:api.admin.priorities.title")]
-    [ClassIdSegment]
     [Cache]
     public sealed class Index : IRestApi
     {
@@ -43,6 +42,11 @@ namespace KleeneStar.Portal.WWW.Api._1_.Classes._classid_.Priorities
             if (_portalManager.GetClass(classId) is null)
             {
                 return PortalAdminApi.NotFound();
+            }
+
+            if (!PortalAdminApi.MayAdminister(classId, request))
+            {
+                return PortalAdminApi.Forbidden();
             }
 
             var payload = _portalManager.GetPriorities(classId)

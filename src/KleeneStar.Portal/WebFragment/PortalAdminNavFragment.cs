@@ -3,6 +3,7 @@ using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
+using WebExpress.WebCore.WebIcon;
 using WebExpress.WebUI.WebFragment;
 using WebExpress.WebUI.WebIcon;
 using WebExpress.WebUI.WebPage;
@@ -16,6 +17,7 @@ namespace KleeneStar.Portal.WebFragment
     /// </summary>
     [Section<SectionAppNavigationPrimary>]
     [Scope<IScopePortal>]
+    [Condition<global::KleeneStar.Portal.WebPermission.OperatorCondition>]
     [Cache]
     public sealed class PortalAdminNavFragment : FragmentControlDropdownItemLink
     {

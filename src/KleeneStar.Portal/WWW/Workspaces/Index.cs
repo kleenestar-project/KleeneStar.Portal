@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebControl;
 using KleeneStar.Portal.WebIcon;
 using KleeneStar.Portal.WebManager;
 using KleeneStar.Portal.WebScope;
@@ -58,6 +59,8 @@ namespace KleeneStar.Portal.WWW.Workspaces
         /// <param name="visualTree">The visual tree of the web application.</param>
         public void Process(IRenderContext renderContext, VisualTreeWebApp visualTree)
         {
+            global::KleeneStar.Portal.WebPermission.PortalAdminAuthorization.Demand(renderContext.Request);
+
             visualTree.Title = HeadlineResource;
             visualTree.Content.MainPanel.Headline.Title = HeadlineResource;
 
@@ -85,7 +88,7 @@ namespace KleeneStar.Portal.WWW.Workspaces
             {
                 var capturedKey = workspace.Key;
                 var capturedName = workspace.Name;
-                var capturedDescription = workspace.Description ?? string.Empty;
+                var capturedDescription = ProseText.ToPlainText(workspace.Description) ?? string.Empty;
                 var classCount = _portalManager.GetClasses(workspace.Id).Count;
                 var capturedCount = classCount;
 

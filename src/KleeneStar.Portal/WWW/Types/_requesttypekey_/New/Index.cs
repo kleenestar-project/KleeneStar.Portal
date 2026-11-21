@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebControl;
 using KleeneStar.Portal.WebAttribute;
 using KleeneStar.Portal.WebDomain;
 using KleeneStar.Portal.WebIcon;
@@ -7,6 +8,7 @@ using KleeneStar.Portal.WebScope;
 using System;
 using System.Linq;
 using WebExpress.WebApp.WebPage;
+using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebPage;
 using WebExpress.WebUI.WebControl;
@@ -19,7 +21,6 @@ namespace KleeneStar.Portal.WWW.Types._requesttypekey_.New
     /// Mirrors the "Create Issue (Modal)" mockup in <c>kleenestar.portal.md</c>.
     /// </summary>
     [WebIcon<RequestTypeIcon>]
-    [RequestTypeKeySegment]
     [Scope<IScopePortal>]
     public sealed class Index : IPage<VisualTreeWebApp>, IScopePortal
     {
@@ -41,7 +42,16 @@ namespace KleeneStar.Portal.WWW.Types._requesttypekey_.New
         /// <summary>Resource key for the request-type unavailable message.</summary>
         public const string NotAvailableResource = "kleenestar.portal:create.unavailable";
 
-        /// <summary>Resource key for the priority prefix (P1..P4).</summary>
+        /// <summary>Resource key for the audience input label.</summary>
+        public const string AudienceLabelResource = "kleenestar.portal:create.audience.label";
+
+        /// <summary>Resource key for the audience of the whole organization.</summary>
+        public const string AudienceOrganizationResource = "kleenestar.portal:create.audience.organization";
+
+        /// <summary>Resource key for the audience of the participants only.</summary>
+        public const string AudienceParticipantsResource = "kleenestar.portal:create.audience.participants";
+
+        /// <summary>Resource key for the priority label pattern (P1..P4); takes the level.</summary>
         public const string PriorityPrefixResource = "kleenestar.portal:create.priority";
 
         private readonly IPortalManager _portalManager;
@@ -94,11 +104,11 @@ namespace KleeneStar.Portal.WWW.Types._requesttypekey_.New
                     Text = _ => template.Title,
                     TextColor = _ => new PropertyColorText(TypeColorText.Secondary)
                 });
-                if (!string.IsNullOrWhiteSpace(template.Description))
+                if (!ProseText.IsEmpty(template.Description))
                 {
                     visualTree.Content.MainPanel.AddPrimary(new ControlText()
                     {
-                        Text = _ => template.Description,
+                        Text = _ => ProseText.ToPlainText(template.Description),
                         TextColor = _ => new PropertyColorText(TypeColorText.Secondary),
                         Margin = _ => new PropertySpacingMargin(PropertySpacing.Space.None, PropertySpacing.Space.None, PropertySpacing.Space.Three, PropertySpacing.Space.None)
                     });
@@ -127,14 +137,47 @@ namespace KleeneStar.Portal.WWW.Types._requesttypekey_.New
             {
                 Label = _ => UrgencyLabelResource
             };
+            // the label is resolved and formatted here rather than composed from the key:
+            // appending the level to the key produced a string no resource matched, so the
+            // combo listed the raw "kleenestar.portal:create.priority 1" to the customer.
+            string Priority(int level) => I18N.Translate(renderContext, PriorityPrefixResource, level);
+
             urgency.Add
             (
-                new ControlFormItemInputComboItem() { Value = _ => "P1", Text = _ => $"{PriorityPrefixResource} 1" },
-                new ControlFormItemInputComboItem() { Value = _ => "P2", Text = _ => $"{PriorityPrefixResource} 2" },
-                new ControlFormItemInputComboItem() { Value = _ => "P3", Text = _ => $"{PriorityPrefixResource} 3" },
-                new ControlFormItemInputComboItem() { Value = _ => "P4", Text = _ => $"{PriorityPrefixResource} 4" }
+                new ControlFormItemInputComboItem() { Value = _ => "P1", Text = _ => Priority(1) },
+                new ControlFormItemInputComboItem() { Value = _ => "P2", Text = _ => Priority(2) },
+                new ControlFormItemInputComboItem() { Value = _ => "P3", Text = _ => Priority(3) },
+                new ControlFormItemInputComboItem() { Value = _ => "P4", Text = _ => Priority(4) }
             );
             form.Add(urgency);
+
+            // a request about a person - a dismissal, a complaint, a salary question - must not
+            // be shown to the whole organization; the requester decides when submitting and
+            // can change it later on the visibility page
+            var audience = new ControlFormItemInputCombo("audience")
+            {
+                Label = _ => AudienceLabelResource
+            };
+
+            audience.Add
+            (
+                new ControlFormItemInputComboItem() { Value = _ => "organization", Text = _ => I18N.Translate(renderContext, AudienceOrganizationResource) },
+                new ControlFormItemInputComboItem() { Value = _ => "participants", Text = _ => I18N.Translate(renderContext, AudienceParticipantsResource) }
+            );
+            form.Add(audience);
+
+            // the endpoint is the request type's own address only by convention of this page;
+            // the payload has to say which request type and template it is for
+            form.Add(new PresetHiddenInput("portal-create-request-type")
+            {
+                Name = _ => "requestTypeKey",
+                Value = _ => requestType.Key
+            });
+            form.Add(new PresetHiddenInput("portal-create-template")
+            {
+                Name = _ => "templateKey",
+                Value = _ => template?.Key ?? string.Empty
+            });
 
             form.AddPrimaryButton(new ControlFormItemButtonSubmit() { Text = _ => SubmitResource });
             form.AddPrimaryButton(new ControlFormItemButton() { Text = _ => CancelResource });

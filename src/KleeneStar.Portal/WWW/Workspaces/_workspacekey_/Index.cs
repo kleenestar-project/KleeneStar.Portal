@@ -1,4 +1,5 @@
 using KleeneStar.Core.WebAttribute;
+using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Portal.WebIcon;
 using KleeneStar.Portal.WebManager;
@@ -59,6 +60,8 @@ namespace KleeneStar.Portal.WWW.Workspaces._workspacekey_
         /// <param name="visualTree">The visual tree of the web application.</param>
         public void Process(IRenderContext renderContext, VisualTreeWebApp visualTree)
         {
+            global::KleeneStar.Portal.WebPermission.PortalAdminAuthorization.Demand(renderContext.Request);
+
             var keyParameter = renderContext.Request.GetParameter<WorkspaceKeyParameter>();
             var workspace = _portalManager.GetWorkspace(keyParameter?.Value);
 
@@ -77,7 +80,7 @@ namespace KleeneStar.Portal.WWW.Workspaces._workspacekey_
 
             visualTree.Content.MainPanel.AddPrimary(new ControlText()
             {
-                Text = _ => workspace.Description ?? string.Empty,
+                Text = _ => ProseText.ToPlainText(workspace.Description) ?? string.Empty,
                 TextColor = _ => new PropertyColorText(TypeColorText.Secondary),
                 Margin = _ => new PropertySpacingMargin(PropertySpacing.Space.None, PropertySpacing.Space.None, PropertySpacing.Space.Three, PropertySpacing.Space.None)
             });
@@ -109,10 +112,10 @@ namespace KleeneStar.Portal.WWW.Workspaces._workspacekey_
             {
                 var capturedId = cls.Id;
                 var capturedName = cls.Name;
-                var capturedDescription = cls.Description ?? string.Empty;
+                var capturedDescription = ProseText.ToPlainText(cls.Description) ?? string.Empty;
                 var badge = cls.PortalVisible ? PortalVisibleResource : InternalResource;
 
-                var tile = new ControlPanelCard($"portal-class-tile-{cls.Id}")
+                var tile = new ControlCard($"portal-class-tile-{cls.Id}")
                 {
                     Header = _ => capturedName,
                     Margin = _ => new PropertySpacingMargin(PropertySpacing.Space.One, PropertySpacing.Space.One, PropertySpacing.Space.One, PropertySpacing.Space.One)

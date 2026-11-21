@@ -1,10 +1,12 @@
 using KleeneStar.Core.WebAttribute;
+using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Portal.WebIcon;
 using KleeneStar.Portal.WebManager;
 using KleeneStar.Portal.WebScope;
 using System.Linq;
 using WebExpress.WebApp.WebPage;
+using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebPage;
 using WebExpress.WebUI.WebControl;
@@ -17,7 +19,6 @@ namespace KleeneStar.Portal.WWW.Workspaces._workspacekey_.Classes
     /// <see cref="WorkspaceKeySegmentAttribute"/>.
     /// </summary>
     [WebIcon<RequestTypeIcon>]
-    [WorkspaceKeySegment]
     [Scope<IScopePortal>]
     [Cache]
     public sealed class Index : IPage<VisualTreeWebApp>, IScopePortal
@@ -55,12 +56,16 @@ namespace KleeneStar.Portal.WWW.Workspaces._workspacekey_.Classes
         /// <param name="visualTree">The visual tree of the web application.</param>
         public void Process(IRenderContext renderContext, VisualTreeWebApp visualTree)
         {
+            global::KleeneStar.Portal.WebPermission.PortalAdminAuthorization.Demand(renderContext.Request);
+
             var keyParameter = renderContext.Request.GetParameter<WorkspaceKeyParameter>();
             var workspace = _portalManager.GetWorkspace(keyParameter?.Value);
 
+            // the heading is resolved before the workspace name is prefixed; interpolating
+            // the raw key would leave it untranslated in the browser tab
             visualTree.Title = workspace is null
                 ? HeadlineResource
-                : $"{workspace.Name} — {HeadlineResource}";
+                : $"{workspace.Name} — {I18N.Translate(renderContext, HeadlineResource)}";
             visualTree.Content.MainPanel.Headline.Title = HeadlineResource;
 
             if (workspace is null)
@@ -93,7 +98,7 @@ namespace KleeneStar.Portal.WWW.Workspaces._workspacekey_.Classes
             {
                 var capturedId = cls.Id;
                 var capturedName = cls.Name;
-                var capturedDescription = cls.Description ?? string.Empty;
+                var capturedDescription = ProseText.ToPlainText(cls.Description) ?? string.Empty;
 
                 table = table.AddRow
                 (

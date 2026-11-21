@@ -14,7 +14,6 @@ namespace KleeneStar.Portal.WWW.Api._1_.Classes._classid_.Fields._fieldid_
     /// as well.
     /// </summary>
     [Title("kleenestar.portal:api.admin.field.clone.title")]
-    [FieldIdSegment]
     [Cache]
     public sealed class Clone : IRestApi
     {
@@ -39,6 +38,11 @@ namespace KleeneStar.Portal.WWW.Api._1_.Classes._classid_.Fields._fieldid_
             if (fieldIdParameter is null || !Guid.TryParse(fieldIdParameter.Value, out var fieldId))
             {
                 return PortalAdminApi.BadRequest("Invalid field id.");
+            }
+
+            if (!PortalAdminApi.MayAdministerField(fieldId, request))
+            {
+                return PortalAdminApi.Forbidden();
             }
 
             var clone = _portalManager.CloneField(fieldId);
