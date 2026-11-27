@@ -37,6 +37,7 @@ namespace KleeneStar.Portal.Test
             ("_navigatorLinkManager", typeof(NavigatorLinkManager)),
             ("_maintenanceManager", typeof(MaintenanceManager)),
             ("_brandingManager", typeof(BrandingManager)),
+            ("_workspaceTransferManager", typeof(WorkspaceTransferManager)),
             ("_objectKindManager", typeof(ObjectKindManager)),
             ("_objectRendererManager", typeof(ObjectRendererManager)),
             ("_authenticationSourceManager", typeof(AuthenticationSourceManager)),
